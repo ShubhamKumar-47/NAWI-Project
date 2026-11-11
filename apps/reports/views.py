@@ -234,11 +234,10 @@ def initiate_revision(request, session_pk):
     Unlocks the record for technical adjustments and increments revision_number,
     while permanently preserving all historical reports, files, and data snapshots.
     """
-    session = get_object_or_404(
-        TestSession.objects.select_related("instrument", "organization"),
-        pk=session_pk,
-        organization=request.user.organization,
-    )
+    session_qs = TestSession.objects.select_related("instrument", "organization")
+    if not request.user.is_superadmin:
+        session_qs = session_qs.filter(organization=request.user.organization)
+    session = get_object_or_404(session_qs, pk=session_pk)
 
     # Security check: Only reviewers or administrators can initiate a controlled revision
     if not (
@@ -315,11 +314,10 @@ def generate_report(request, session_pk):
     - Only approved records (APPROVED or REPORT_GENERATED) can generate final reports.
     - Historical versions are preserved and marked as superseded (never silently overwritten).
     """
-    session = get_object_or_404(
-        TestSession,
-        pk=session_pk,
-        organization=request.user.organization,
-    )
+    session_qs = TestSession.objects.select_related("instrument", "organization")
+    if not request.user.is_superadmin:
+        session_qs = session_qs.filter(organization=request.user.organization)
+    session = get_object_or_404(session_qs, pk=session_pk)
 
     # Security rule: Only approved test records can generate final reports
     if session.status not in [SessionStatus.APPROVED, SessionStatus.REPORT_GENERATED]:
@@ -520,11 +518,10 @@ def session_download_report(request, session_pk, fmt):
     If report already exists, downloads the active version and logs audit trail.
     If session is approved but file not yet compiled, compiles it on the fly.
     """
-    session = get_object_or_404(
-        TestSession,
-        pk=session_pk,
-        organization=request.user.organization,
-    )
+    session_qs = TestSession.objects.select_related("instrument", "organization")
+    if not request.user.is_superadmin:
+        session_qs = session_qs.filter(organization=request.user.organization)
+    session = get_object_or_404(session_qs, pk=session_pk)
 
     fmt_upper = fmt.upper()
     if fmt_upper not in [ReportType.PDF, ReportType.DOCX]:
@@ -579,11 +576,10 @@ def session_pdf_preview(request, session_pk):
     Convenience view: Opens the latest generated report preview for a session,
     or generates an on-the-fly preview if already approved.
     """
-    session = get_object_or_404(
-        TestSession,
-        pk=session_pk,
-        organization=request.user.organization,
-    )
+    session_qs = TestSession.objects.select_related("instrument", "organization")
+    if not request.user.is_superadmin:
+        session_qs = session_qs.filter(organization=request.user.organization)
+    session = get_object_or_404(session_qs, pk=session_pk)
 
     latest_report = GeneratedReport.objects.filter(
         session=session, report_type=ReportType.PDF, is_superseded=False

@@ -236,9 +236,18 @@
                     {% for item in p.items %}
                     <tr>
                       <td class="fw-semibold font-sans-serif">{{ item.title }}</td>
-                      <td>{{ item.ref_load }} {{ instrument.unit_of_measure }}</td>
-                      <td>{{ item.indication|default:item.gross_indication }} {{ instrument.unit_of_measure }}</td>
-                      <td>{{ item.zero_indication|default:item.tare|default:"0.0" }}</td>
+                      <td>{% if item.ref_load is not None %}{{ item.ref_load }} {{ instrument.unit_of_measure }}{% else %}—{% endif %}</td>
+                      <td>
+                        {% if item.indication is not None %}{{ item.indication }} {{ instrument.unit_of_measure }}
+                        {% elif item.gross_indication is not None %}{{ item.gross_indication }} {{ instrument.unit_of_measure }}
+                        {% elif item.indication_after is not None %}{{ item.indication_after }} {{ instrument.unit_of_measure }}
+                        {% else %}—{% endif %}
+                      </td>
+                      <td>
+                        {% if item.zero_indication is not None %}{{ item.zero_indication }}
+                        {% elif item.tare is not None %}{{ item.tare }}
+                        {% else %}0.0{% endif %}
+                      </td>
                       <td>
                         {% if item.error is not None %}
                         <span class="{% if item.status == 'PASS' %}text-success{% elif item.status == 'FAIL' %}text-danger fw-bold{% endif %}">

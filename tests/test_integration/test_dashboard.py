@@ -7,6 +7,7 @@ from apps.instruments.models import Instrument
 from apps.test_sessions.models import TestSession
 from decimal import Decimal
 import datetime
+from django.utils import timezone
 
 
 class TestDashboardComponents(TestCase):
@@ -37,7 +38,7 @@ class TestDashboardComponents(TestCase):
             created_by=self.user,
         )
 
-        today = datetime.date.today()
+        today = timezone.localdate()
 
         # Create test records with various statuses
         TestSession.objects.create(
