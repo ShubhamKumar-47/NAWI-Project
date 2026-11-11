@@ -1,0 +1,514 @@
+{% extends "base/_base.html" %}
+{% load static %}
+
+{% block title %}Technical Review &amp; Approval — {{ session.session_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+
+  <!-- Top Navigation & Action Header -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1 small">
+          <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:reviewer_dashboard' %}">Review &amp; Approvals</a></li>
+          <li class="breadcrumb-item active" aria-current="page">{{ session.session_number }}</li>
+        </ol>
+      </nav>
+      <div class="d-flex align-items-center gap-2">
+        <h4 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-shield-check text-primary me-2"></i>Review &amp; Approval Inspection Console
+        </h4>
+        <span class="badge {% if session.status == 'APPROVED' %}bg-success{% elif session.status == 'REPORT_GENERATED' %}bg-primary{% elif session.status == 'REJECTED' %}bg-danger{% elif session.status == 'UNDER_REVIEW' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %} fs-6 text-uppercase">
+          {{ session.get_status_display }}
+        </span>
+        {% if session.revision_number > 1 %}
+        <span class="badge bg-secondary fs-6">Rev {{ session.revision_number }}</span>
+        {% endif %}
+      </div>
+      <small class="text-muted font-monospace">Test Reference: {{ session.session_number }} &bull; Standard: {{ session.get_oiml_edition_display }}</small>
+    </div>
+
+    <!-- Reviewer Action Buttons -->
+    <div class="d-flex gap-2 align-items-center mt-2 mt-sm-0">
+      {% if can_start_review %}
+      <form method="post" action="{% url 'test_sessions:start_review' session.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-info btn-sm shadow-sm text-dark fw-semibold">
+          <i class="bi bi-play-circle me-1"></i>Start Technical Review
+        </button>
+      </form>
+      {% endif %}
+
+      {% if can_approve %}
+      <button type="button" class="btn btn-success btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#approveModal">
+        <i class="bi bi-check-circle me-1"></i>Approve &amp; Certify
+      </button>
+      {% elif session.status != 'APPROVED' and session.status != 'REPORT_GENERATED' and not session.is_locked %}
+      <button type="button" class="btn btn-secondary btn-sm" disabled title="Approval blocked: Complete all required procedures first.">
+        <i class="bi bi-lock me-1"></i>Approve (Blocked)
+      </button>
+      {% endif %}
+
+      {% if can_reject %}
+      <button type="button" class="btn btn-danger btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#rejectModal">
+        <i class="bi bi-arrow-return-left me-1"></i>Return for Correction
+      </button>
+      {% endif %}
+
+      {% if can_revise %}
+      <button type="button" class="btn btn-warning btn-sm shadow-sm text-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#revisionModal">
+        <i class="bi bi-pencil-square me-1"></i>Controlled Revision
+      </button>
+      {% endif %}
+
+      {% if can_generate_report %}
+      <a href="{% url 'reports:generate' session.pk %}" class="btn btn-primary btn-sm shadow-sm">
+        <i class="bi bi-file-earmark-pdf me-1"></i>Generate Report
+      </a>
+      {% endif %}
+
+      <a href="{% url 'test_sessions:results_print' session.pk %}" target="_blank" class="btn btn-outline-dark btn-sm">
+        <i class="bi bi-printer me-1"></i>Print View
+      </a>
+    </div>
+  </div>
+
+  <!-- Rejection / Revision Banners if applicable -->
+  {% if session.status == 'REJECTED' and session.rejection_reason %}
+  <div class="alert alert-danger shadow-sm border-0 d-flex gap-3 align-items-start mb-4" role="alert">
+    <i class="bi bi-exclamation-octagon-fill fs-3 text-danger flex-shrink-0 mt-1"></i>
+    <div>
+      <h6 class="alert-heading fw-bold mb-1">Returned for Operator Correction</h6>
+      <p class="mb-1 text-dark">{{ session.rejection_reason }}</p>
+      <small class="text-muted">Returned by: <strong>{{ session.reviewer.full_name }}</strong> on {{ session.rejected_at|date:"Y-m-d H:i" }}</small>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if session.revision_number > 1 and session.revision_reason %}
+  <div class="alert alert-info shadow-sm border-0 d-flex gap-3 align-items-start mb-4" role="alert">
+    <i class="bi bi-info-circle-fill fs-3 text-info flex-shrink-0 mt-1"></i>
+    <div>
+      <h6 class="alert-heading fw-bold mb-1">Controlled Revision #{{ session.revision_number }} in Progress</h6>
+      <p class="mb-1 text-dark">{{ session.revision_reason }}</p>
+      <small class="text-muted">Approved record unlocked under laboratory change control.</small>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── 1. Instrument Details & Metrological Parameters Card ────────────────── -->
+  <div class="card border-0 shadow-sm mb-4 bg-white">
+    <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+      <span class="fw-bold small text-uppercase text-secondary">
+        <i class="bi bi-cpu me-1 text-primary"></i>1. Instrument Metrological Identification
+      </span>
+      <a href="{% url 'instruments:detail' instrument.pk %}" class="btn btn-link btn-sm py-0 text-decoration-none">
+        Instrument Profile <i class="bi bi-arrow-right"></i>
+      </a>
+    </div>
+    <div class="card-body p-3">
+      <div class="row g-3 small">
+        <div class="col-md-3">
+          <span class="text-muted d-block">Instrument &amp; Model</span>
+          <strong class="text-dark fs-6">{{ instrument.display_name }}</strong>
+          <div class="text-muted">Mfr: <span class="text-dark">{{ instrument.manufacturer|default:"—" }}</span></div>
+          <div class="text-muted">Owner: <span class="text-dark">{{ instrument.customer_name|default:session.organization.name }}</span></div>
+        </div>
+        <div class="col-md-3">
+          <span class="text-muted d-block">Metrological Characteristics</span>
+          <div>Accuracy Class: <strong class="badge bg-primary">{{ instrument.get_accuracy_class_display }}</strong></div>
+          <div>Capacity: <span class="font-monospace text-dark fw-bold">{{ instrument.min_capacity }} &mdash; {{ instrument.max_capacity }} {{ instrument.unit_of_measure }}</span></div>
+          <div>Scale Intervals: <span class="font-monospace text-dark">e = {{ instrument.actual_scale_interval }} {{ instrument.unit_of_measure }}, d = {{ instrument.scale_interval }}</span></div>
+        </div>
+        <div class="col-md-3">
+          <span class="text-muted d-block">Serial Number &amp; Traceability</span>
+          <div>Serial Number: <span class="font-monospace fw-bold text-dark">{{ instrument.serial_number }}</span></div>
+          <div>Lab Reference: <span class="font-monospace text-dark">{{ session.lab_reference_number|default:"—" }}</span></div>
+          <div>Standards Used: <span class="text-dark">{{ session.reference_standards|default:"Standard Class E2/F1 Weights" }}</span></div>
+        </div>
+        <div class="col-md-3">
+          <span class="text-muted d-block">Test Environment &amp; Personnel</span>
+          <div>Test Date: <strong class="text-dark">{{ session.test_date|date:"Y-m-d" }}</strong></div>
+          <div>Ambient Temp: <span class="text-dark">{{ session.temperature_range }}</span></div>
+          <div>Humidity: <span class="text-dark">{{ session.humidity_range }}</span></div>
+          <div>Operator: <strong class="text-dark">{{ session.technician.full_name }}</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2. Test Procedures Verification Summary ────────────────────────────── -->
+  <div class="card border-0 shadow-sm mb-4 bg-white">
+    <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+      <span class="fw-bold small text-uppercase text-secondary">
+        <i class="bi bi-list-check me-1 text-primary"></i>2. Applicable Test Procedures &amp; Acceptance Status
+      </span>
+      <span class="badge {% if report.overall_status == 'PASS' %}bg-success{% elif report.overall_status == 'FAIL' %}bg-danger{% else %}bg-warning text-dark{% endif %} text-uppercase">
+        Overall: {{ report.overall_status }}
+      </span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 small">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 30%;">Test Procedure</th>
+            <th style="width: 25%;">Governing Clause</th>
+            <th style="width: 15%;" class="text-center">Observations</th>
+            <th style="width: 15%;" class="text-center">Drafts</th>
+            <th style="width: 15%;" class="text-end pe-3">Procedure Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for code, p in summaries.items %}
+          <tr>
+            <td>
+              <strong class="text-dark">{{ p.name }}</strong>
+            </td>
+            <td>
+              <span class="font-monospace text-secondary">{{ p.clause }}</span>
+            </td>
+            <td class="text-center font-monospace">{{ p.total_count }}</td>
+            <td class="text-center">
+              {% if p.draft_count > 0 %}
+              <span class="badge bg-warning text-dark">{{ p.draft_count }} draft</span>
+              {% else %}
+              <span class="text-muted">&mdash;</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-3">
+              {% if p.status == 'PASS' %}
+              <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>PASS</span>
+              {% elif p.status == 'FAIL' %}
+              <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>FAIL</span>
+              {% else %}
+              <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>INCOMPLETE</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── 3. Original Observations & Calculations Inspection Accordion ────────── -->
+  <div class="card border-0 shadow-sm mb-4 bg-white">
+    <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+      <span class="fw-bold small text-uppercase text-secondary">
+        <i class="bi bi-calculator me-1 text-primary"></i>3. Detailed Measurement Observations, Calculated Errors &amp; Acceptance Criteria
+      </span>
+      <small class="text-muted">OIML R 76 Table 1 MPE Verification</small>
+    </div>
+    <div class="card-body p-3">
+      <div class="accordion" id="procedureInspectionAccordion">
+        {% for code, p in summaries.items %}
+        {% if p.items %}
+        <div class="accordion-item mb-2 border rounded">
+          <h2 class="accordion-header" id="heading-{{ code }}">
+            <button class="accordion-button collapsed py-2 px-3 fw-semibold bg-light" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#collapse-{{ code }}" aria-expanded="false" aria-controls="collapse-{{ code }}">
+              <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                <span>{{ p.name }} <small class="text-muted font-monospace ms-2">({{ p.clause }})</small></span>
+                <span class="badge {% if p.status == 'PASS' %}bg-success{% elif p.status == 'FAIL' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                  {{ p.status }} ({{ p.total_count }} obs)
+                </span>
+              </div>
+            </button>
+          </h2>
+          <div id="collapse-{{ code }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ code }}" data-bs-parent="#procedureInspectionAccordion">
+            <div class="accordion-body p-0">
+              <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle mb-0 font-monospace small">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Point / Repetition</th>
+                      <th>Reference Load</th>
+                      <th>Indication</th>
+                      <th>Zero / Tare</th>
+                      <th>Calculated Error ($E$)</th>
+                      <th>Permissible Error ($|\text{MPE}|$)</th>
+                      <th class="text-center">Verdict</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for item in p.items %}
+                    <tr>
+                      <td class="fw-semibold font-sans-serif">{{ item.title }}</td>
+                      <td>{{ item.ref_load }} {{ instrument.unit_of_measure }}</td>
+                      <td>{{ item.indication|default:item.gross_indication }} {{ instrument.unit_of_measure }}</td>
+                      <td>{{ item.zero_indication|default:item.tare|default:"0.0" }}</td>
+                      <td>
+                        {% if item.error is not None %}
+                        <span class="{% if item.status == 'PASS' %}text-success{% elif item.status == 'FAIL' %}text-danger fw-bold{% endif %}">
+                          {{ item.error }} {{ instrument.unit_of_measure }}
+                        </span>
+                        {% else %}
+                        &mdash;
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if item.mpe is not None %}
+                        &plusmn;{{ item.mpe }} {{ instrument.unit_of_measure }}
+                        {% else %}
+                        &mdash;
+                        {% endif %}
+                      </td>
+                      <td class="text-center">
+                        {% if item.is_draft %}
+                        <span class="badge bg-warning text-dark">DRAFT</span>
+                        {% elif item.status == 'PASS' %}
+                        <span class="badge bg-success">PASS</span>
+                        {% elif item.status == 'FAIL' %}
+                        <span class="badge bg-danger">FAIL</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ item.status }}</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. Warnings, Exceptions & Acceptance Criteria Decisions ─────────────── -->
+  {% if report.missing_data_warnings or report.invalid_measurement_warnings or report.unverified_rule_warnings %}
+  <div class="card border-0 shadow-sm mb-4 bg-white border-start border-4 border-warning">
+    <div class="card-header bg-white py-2 px-3 border-bottom">
+      <span class="fw-bold small text-uppercase text-warning-emphasis">
+        <i class="bi bi-exclamation-triangle-fill me-1 text-warning"></i>4. Metrological Warnings &amp; Exceptions
+      </span>
+    </div>
+    <div class="card-body p-3 small">
+      {% if report.missing_data_warnings %}
+      <div class="mb-2">
+        <strong class="text-danger">Missing Observation Data:</strong>
+        <ul class="mb-1 ps-3 text-muted">
+          {% for w in report.missing_data_warnings %}
+          <li>{{ w }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      {% if report.invalid_measurement_warnings %}
+      <div class="mb-2">
+        <strong class="text-warning-emphasis">Observation Warnings:</strong>
+        <ul class="mb-1 ps-3 text-muted">
+          {% for w in report.invalid_measurement_warnings %}
+          <li>{{ w }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      {% if report.unverified_rule_warnings %}
+      <div>
+        <strong class="text-dark">Unverified Metrological Rules:</strong>
+        <ul class="mb-1 ps-3 text-muted">
+          {% for w in report.unverified_rule_warnings %}
+          <li>{{ w }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      <div class="alert alert-light border mt-3 mb-0 small text-secondary">
+        <i class="bi bi-info-circle me-1"></i>
+        <strong>Normative Rule:</strong> OIML R 76 and ISO/IEC 17025 prohibit granting an overall PASS status if any applicable procedure is incomplete or unverified.
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── 5. Complete Immutable Approval History Ledger ───────────────────────── -->
+  <div class="card border-0 shadow-sm mb-4 bg-white">
+    <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+      <span class="fw-bold small text-uppercase text-secondary">
+        <i class="bi bi-clock-history me-1 text-primary"></i>5. Complete Review &amp; Approval History (Audit Trail)
+      </span>
+      <span class="badge bg-secondary">{{ approval_history.count }} Event(s)</span>
+    </div>
+    <div class="card-body p-3">
+      {% if approval_history %}
+      <div class="timeline">
+        {% for entry in approval_history %}
+        <div class="d-flex align-items-start mb-3 pb-3 border-bottom">
+          <div class="me-3 mt-1">
+            {% if entry.action == 'APPROVE' %}
+            <div class="bg-success text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+              <i class="bi bi-check-lg"></i>
+            </div>
+            {% elif entry.action == 'REJECT' %}
+            <div class="bg-danger text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+              <i class="bi bi-x-lg"></i>
+            </div>
+            {% elif entry.action == 'START_REVIEW' %}
+            <div class="bg-info text-dark rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+              <i class="bi bi-search"></i>
+            </div>
+            {% elif entry.action == 'REVISE' %}
+            <div class="bg-warning text-dark rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+              <i class="bi bi-pencil"></i>
+            </div>
+            {% elif entry.action == 'GENERATE_REPORT' %}
+            <div class="bg-primary text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+              <i class="bi bi-file-earmark-pdf"></i>
+            </div>
+            {% else %}
+            <div class="bg-secondary text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+              <i class="bi bi-send"></i>
+            </div>
+            {% endif %}
+          </div>
+          <div class="flex-grow-1 small">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <strong class="text-dark">{{ entry.get_action_display }}</strong>
+                <span class="text-muted ms-2">&bull; By <strong>{{ entry.actor.full_name }}</strong> ({{ entry.actor.get_role_display|default:entry.actor.role }})</span>
+              </div>
+              <span class="text-muted font-monospace">{{ entry.created_at|date:"Y-m-d H:i:s" }}</span>
+            </div>
+            <div class="mt-1">
+              <span class="badge bg-light text-dark border">{{ entry.from_status }}</span>
+              <i class="bi bi-arrow-right mx-1 text-muted"></i>
+              <span class="badge bg-light text-dark border">{{ entry.to_status }}</span>
+            </div>
+            {% if entry.comments %}
+            <div class="mt-2 p-2 bg-light rounded text-dark border">
+              {{ entry.comments }}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted small mb-0">No approval history entries recorded yet for this session.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <div class="d-flex justify-content-between align-items-center pt-2 mb-4">
+    <a href="{% url 'test_sessions:reviewer_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back to Reviewer Dashboard
+    </a>
+    <div class="d-flex gap-2">
+      <a href="{% url 'test_sessions:results' session.pk %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-clipboard2-data me-1"></i>Results Overview
+      </a>
+      <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-outline-dark btn-sm">
+        <i class="bi bi-info-circle me-1"></i>Session Summary
+      </a>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── APPROVAL MODAL ───────────────────────────────────────────────────────── -->
+<div class="modal fade" id="approveModal" tabindex="-1" aria-labelledby="approveModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'test_sessions:approve' session.pk %}">
+        {% csrf_token %}
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title" id="approveModalLabel"><i class="bi bi-shield-check me-2"></i>Approve Test Record</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body small">
+          <p class="mb-3">
+            You are formally certifying that test record <strong>{{ session.session_number }}</strong>
+            complies with the metrological tolerances of <strong>{{ session.get_oiml_edition_display }}</strong>.
+          </p>
+          <div class="alert alert-warning py-2 mb-3">
+            <i class="bi bi-lock-fill me-1"></i>
+            Upon approval, this test session will be <strong>permanently locked</strong> and cannot be edited except through a controlled revision process.
+          </div>
+          <div class="mb-3">
+            <label for="id_comments" class="form-label fw-semibold">Reviewer Verification Notes (Optional)</label>
+            <textarea name="comments" id="id_comments" rows="3" class="form-control" placeholder="Enter any technical remarks, conformity verification statement, or inspection conditions..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check-circle me-1"></i>Confirm Approval &amp; Lock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── REJECTION MODAL ──────────────────────────────────────────────────────── -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'test_sessions:reject' session.pk %}">
+        {% csrf_token %}
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title" id="rejectModalLabel"><i class="bi bi-arrow-return-left me-2"></i>Return Test Record for Correction</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body small">
+          <p class="mb-3">
+            Returning test record <strong>{{ session.session_number }}</strong> will unlock the observations
+            and return the test to the laboratory operator for technical remediation.
+          </p>
+          <div class="mb-3">
+            <label for="id_reason" class="form-label fw-bold">Mandatory Technical Rejection Reason</label>
+            <textarea name="reason" id="id_reason" rows="4" class="form-control" required minlength="10"
+                      placeholder="Explain specifically why this test is being returned (e.g. MPE exceeded at 500g, missing unloading cycle, draft observations, or unstable environment)...">{{ session.rejection_reason }}</textarea>
+            <div class="form-text">Minimum 10 characters required. This comment will be logged in the permanent audit trail.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-x-circle me-1"></i>Return for Correction</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── CONTROLLED REVISION MODAL ────────────────────────────────────────────── -->
+<div class="modal fade" id="revisionModal" tabindex="-1" aria-labelledby="revisionModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'test_sessions:initiate_revision' session.pk %}">
+        {% csrf_token %}
+        <div class="modal-header bg-warning text-dark">
+          <h5 class="modal-title" id="revisionModalLabel"><i class="bi bi-pencil-square me-2"></i>Initiate Controlled Revision</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body small">
+          <p class="mb-2">
+            Initiating a revision on approved record <strong>{{ session.session_number }}</strong>
+            will advance the revision counter to <strong>Rev {{ session.revision_number|add:1 }}</strong> and unlock the record.
+          </p>
+          <div class="alert alert-warning py-2 mb-3">
+            <i class="bi bi-shield-exclamation me-1"></i>
+            Per ISO/IEC 17025 §7.8.8, any amendment to an approved certificate must identify the reason for the change.
+          </div>
+          <div class="mb-3">
+            <label for="id_revision_reason" class="form-label fw-bold">Change Control Justification (Mandatory)</label>
+            <textarea name="revision_reason" id="id_revision_reason" rows="4" class="form-control" required minlength="15"
+                      placeholder="Explain the technical or administrative justification for revising this approved certificate (minimum 15 characters)..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning btn-sm text-dark fw-semibold"><i class="bi bi-arrow-repeat me-1"></i>Authorize Revision</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+

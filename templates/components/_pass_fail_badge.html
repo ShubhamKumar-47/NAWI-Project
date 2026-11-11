@@ -1,0 +1,14 @@
+{% comment %}
+Usage: {% include "components/_pass_fail_badge.html" with result=measurement.pass_fail %}
+{% endcomment %}
+{% if result == 'PASS' %}
+  <span class="badge badge-soft-success"><i class="bi bi-check-circle-fill me-1"></i>PASS</span>
+{% elif result == 'FAIL' %}
+  <span class="badge badge-soft-danger"><i class="bi bi-x-circle-fill me-1"></i>FAIL</span>
+{% elif result == 'PENDING' %}
+  <span class="badge badge-soft-warning"><i class="bi bi-hourglass-split me-1"></i>Pending</span>
+{% elif result == 'N/A' %}
+  <span class="badge badge-soft-primary text-muted">N/A</span>
+{% else %}
+  <span class="badge badge-soft-primary">{{ result|default:"—" }}</span>
+{% endif %}

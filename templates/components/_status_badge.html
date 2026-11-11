@@ -1,0 +1,30 @@
+{% comment %}
+Usage: {% include "components/_status_badge.html" with status=session.status %}
+{% endcomment %}
+{% if status == 'DRAFT' %}
+  <span class="badge badge-soft-primary"><i class="bi bi-pencil me-1"></i>Draft</span>
+{% elif status == 'SUBMITTED' %}
+  <span class="badge badge-soft-info"><i class="bi bi-send me-1"></i>Submitted</span>
+{% elif status == 'PENDING_REVIEW' %}
+  <span class="badge badge-soft-warning"><i class="bi bi-clock-history me-1"></i>Pending Review</span>
+{% elif status == 'UNDER_REVIEW' %}
+  <span class="badge badge-soft-info"><i class="bi bi-search me-1"></i>Under Review</span>
+{% elif status == 'APPROVED' %}
+  <span class="badge badge-soft-success"><i class="bi bi-check-circle-fill me-1"></i>Approved</span>
+{% elif status == 'REPORT_GENERATED' %}
+  <span class="badge badge-soft-success"><i class="bi bi-file-earmark-check-fill me-1"></i>Report Generated</span>
+{% elif status == 'REJECTED' %}
+  <span class="badge badge-soft-danger"><i class="bi bi-x-circle-fill me-1"></i>Rejected</span>
+{% elif status == 'REVISED' %}
+  <span class="badge badge-soft-warning"><i class="bi bi-arrow-repeat me-1"></i>Revised</span>
+{% elif status == 'IN_LAB' %}
+  <span class="badge badge-soft-info"><i class="bi bi-building-check me-1"></i>In Lab</span>
+{% elif status == 'TESTED' %}
+  <span class="badge badge-soft-success"><i class="bi bi-patch-check-fill me-1"></i>Tested</span>
+{% elif status == 'RETURNED' %}
+  <span class="badge badge-soft-primary"><i class="bi bi-arrow-return-left me-1"></i>Returned</span>
+{% elif status == 'IN_PROGRESS' %}
+  <span class="badge badge-soft-info"><i class="bi bi-hourglass-split me-1"></i>In Progress</span>
+{% else %}
+  <span class="badge badge-soft-primary">{{ status|default:"—" }}</span>
+{% endif %}

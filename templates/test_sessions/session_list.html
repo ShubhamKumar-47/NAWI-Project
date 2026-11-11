@@ -1,0 +1,254 @@
+{% extends "base/_base.html" %}
+{% block title %}Test Records — NAWI Test Report Management System{% endblock %}
+
+{% block breadcrumb %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"Test Sessions"}]'|safe %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+  <div>
+    <h4 class="mb-1 fw-bold text-dark">
+      <i class="bi bi-clipboard2-check text-primary me-2"></i>Test Sessions &amp; Records
+    </h4>
+    <p class="text-muted small mb-0">
+      Track, execute, and review OIML R 76 verification test records across all laboratory instruments.
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'test_sessions:create' %}" class="btn btn-primary shadow-sm">
+      <i class="bi bi-plus-lg me-1"></i>New Test Record Wizard
+    </a>
+  </div>
+</div>
+
+<!-- ── Metric Summary Pills ────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-2">
+    <div class="kpi-card p-3">
+      <span class="text-muted small fw-semibold">Total Sessions</span>
+      <h3 class="fw-bold mb-0 text-dark">{{ total_sessions }}</h3>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="kpi-card p-3">
+      <span class="text-muted small fw-semibold">Drafts</span>
+      <h3 class="fw-bold mb-0 text-secondary">{{ draft_count }}</h3>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="kpi-card p-3">
+      <span class="text-muted small fw-semibold">In Progress</span>
+      <h3 class="fw-bold mb-0 text-primary">{{ in_progress_count }}</h3>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="kpi-card p-3">
+      <span class="text-muted small fw-semibold">Pending Review</span>
+      <h3 class="fw-bold mb-0 text-warning">{{ pending_count }}</h3>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="kpi-card p-3">
+      <span class="text-muted small fw-semibold">Approved</span>
+      <h3 class="fw-bold mb-0 text-success">{{ approved_count }}</h3>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="kpi-card p-3">
+      <span class="text-muted small fw-semibold">Rejected</span>
+      <h3 class="fw-bold mb-0 text-danger">{{ rejected_count }}</h3>
+    </div>
+  </div>
+</div>
+
+<!-- ── Search & Filter Controls ────────────────────────────────────────── -->
+<div class="card shadow-sm mb-4 border-0">
+  <div class="card-body p-3 bg-light rounded">
+    <form method="get" class="row g-2 align-items-center">
+      <!-- Search input -->
+      <div class="col-12 col-md-4">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+          <input
+            type="text"
+            name="q"
+            class="form-control"
+            placeholder="Search Test ID, S/N, model, operator, client..."
+            value="{{ search_query }}"
+            data-table-search="#sessions-table"
+          >
+        </div>
+      </div>
+
+      <!-- Filter: Status -->
+      <div class="col-6 col-md-2">
+        <select name="status" class="form-select form-select-sm">
+          <option value="">All Statuses</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if current_status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Filter: OIML Edition -->
+      <div class="col-6 col-md-2">
+        <select name="oiml_edition" class="form-select form-select-sm">
+          <option value="">All OIML Editions</option>
+          {% for val, label in oiml_editions %}
+          <option value="{{ val }}" {% if current_edition == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Date From -->
+      <div class="col-6 col-md-2">
+        <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}" placeholder="From date">
+      </div>
+
+      <!-- Date To -->
+      <div class="col-6 col-md-1">
+        <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}" placeholder="To date">
+      </div>
+
+      <!-- Submit / Reset -->
+      <div class="col-12 col-md-1 d-flex gap-1">
+        <button type="submit" class="btn btn-primary btn-sm flex-grow-1" title="Apply Filters">
+          <i class="bi bi-funnel-fill"></i>
+        </button>
+        {% if is_filtered %}
+        <a href="{% url 'test_sessions:list' %}" class="btn btn-outline-danger btn-sm" title="Clear Filters">
+          <i class="bi bi-x-circle"></i>
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Test Sessions Table ──────────────────────────────────────────────── -->
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="sessions-table">
+        <thead class="table-light text-uppercase small fw-bold text-muted border-bottom">
+          <tr>
+            <th class="ps-3">Test ID / Session #</th>
+            <th>Instrument Under Test</th>
+            <th>Test Date</th>
+            <th>Operator</th>
+            <th>Procedures</th>
+            <th>Status</th>
+            <th>Result</th>
+            <th class="text-end pe-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for session in sessions %}
+          <tr>
+            <!-- Test ID -->
+            <td class="ps-3 font-monospace fw-bold">
+              <a href="{% url 'test_sessions:detail' session.pk %}" class="text-primary text-decoration-none">
+                {{ session.session_number }}
+              </a>
+              {% if session.lab_reference_number %}
+              <small class="text-muted d-block font-monospace">Ref: {{ session.lab_reference_number }}</small>
+              {% endif %}
+            </td>
+
+            <!-- Instrument -->
+            <td>
+              <span class="fw-semibold text-dark">{{ session.instrument.manufacturer }} {{ session.instrument.model_name }}</span>
+              <small class="text-muted d-block font-monospace">
+                S/N: {{ session.instrument.serial_number }} &bull; Class {{ session.instrument.accuracy_class }}
+              </small>
+            </td>
+
+            <!-- Date & Location -->
+            <td class="small">
+              <span class="text-dark fw-semibold">{{ session.test_date|date:"d M Y" }}</span>
+              {% if session.test_location %}
+              <small class="text-muted d-block text-truncate" style="max-width: 140px;">
+                <i class="bi bi-geo-alt me-1"></i>{{ session.test_location }}
+              </small>
+              {% endif %}
+            </td>
+
+            <!-- Operator -->
+            <td class="small">
+              <span class="text-dark">
+                {% if session.technician %}{{ session.technician.get_full_name|default:session.technician.username }}{% else %}—{% endif %}
+              </span>
+              {% if session.reviewer %}
+              <small class="text-muted d-block">
+                Rev: {% if session.reviewer %}{{ session.reviewer.get_full_name|default:session.reviewer.username }}{% endif %}
+              </small>
+              {% endif %}
+            </td>
+
+            <!-- Procedures Count Badge -->
+            <td>
+              <span class="badge bg-light text-dark border font-monospace px-2 py-1" title="Active test procedures">
+                <i class="bi bi-check2-square text-primary me-1"></i>{{ session.active_procedures_count }} Tests
+              </span>
+            </td>
+
+            <!-- Status Badge -->
+            <td>
+              {% include "components/_status_badge.html" with status=session.status %}
+            </td>
+
+            <!-- Overall Result Badge -->
+            <td>
+              {% include "components/_pass_fail_badge.html" with result=session.overall_result %}
+            </td>
+
+            <!-- Action Buttons -->
+            <td class="text-end pe-3 text-nowrap">
+              <div class="btn-group btn-group-sm" role="group">
+                <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-outline-primary" title="View Test Details">
+                  <i class="bi bi-eye"></i>
+                </a>
+                {% if not session.is_locked %}
+                <a href="{% url 'test_sessions:edit' session.pk %}" class="btn btn-outline-secondary" title="Edit Test Record">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                {% endif %}
+                {% if session.status == 'APPROVED' %}
+                <a href="{% url 'reports:generate' session.pk %}?format=pdf" class="btn btn-outline-success" title="Download PDF Certificate">
+                  <i class="bi bi-file-earmark-pdf"></i>
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center text-muted py-5">
+              <i class="bi bi-clipboard2-x fs-1 d-block mb-3 text-secondary"></i>
+              <h6 class="fw-bold">No Test Records Found</h6>
+              <p class="small text-muted mb-3">
+                {% if is_filtered %}
+                No test records match your active search filters. Try clearing filters.
+                {% else %}
+                No verification test sessions have been created yet.
+                {% endif %}
+              </p>
+              {% if is_filtered %}
+              <a href="{% url 'test_sessions:list' %}" class="btn btn-sm btn-outline-secondary me-2">Clear Filters</a>
+              {% endif %}
+              <a href="{% url 'test_sessions:create' %}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Create New Test Record
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Pagination ──────────────────────────────────────────────────────── -->
+{% include "components/_pagination.html" with page_obj=page_obj query_string=query_string %}
+{% endblock %}

@@ -1,0 +1,329 @@
+{% extends "base/_base.html" %}
+{% block title %}Report Audit Trail — {{ report.report_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+
+  <!-- ── Top Navigation Header ────────────────────────────────────────────── -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1 small">
+          <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'reports:list' %}">Test Reports</a></li>
+          <li class="breadcrumb-item active" aria-current="page">{{ report.report_number }}</li>
+        </ol>
+      </nav>
+      <h3 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2">
+        <i class="bi bi-file-earmark-check text-primary"></i>
+        <span>{{ report.report_number }}</span>
+        <span class="badge bg-light text-dark border font-monospace fs-6">Rev #{{ report.revision_number }}</span>
+        {% if report.is_superseded %}
+        <span class="badge bg-secondary fs-6"><i class="bi bi-clock-history me-1"></i>Superseded</span>
+        {% else %}
+        <span class="badge bg-success fs-6"><i class="bi bi-check-circle me-1"></i>Current Active</span>
+        {% endif %}
+      </h3>
+      <p class="text-muted small mb-0 mt-1">
+        Cryptographically signed metrological calibration record under OIML R 76-1 / EN 45501.
+      </p>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="d-flex gap-2 align-items-center mt-3 mt-sm-0">
+      <a href="{% url 'reports:session_download' session.pk 'pdf' %}" class="btn btn-danger btn-sm shadow-sm">
+        <i class="bi bi-file-earmark-pdf me-1"></i>Download PDF
+      </a>
+      <a href="{% url 'reports:session_download' session.pk 'docx' %}" class="btn btn-primary btn-sm shadow-sm">
+        <i class="bi bi-file-earmark-word me-1"></i>Download Word
+      </a>
+      {% if report.report_type == 'PDF' %}
+      <a href="{% url 'reports:preview' report.pk %}" target="_blank" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-eye me-1"></i>Live PDF Preview
+      </a>
+      {% endif %}
+      {% if can_revise %}
+      <a href="{% url 'reports:initiate_revision' session.pk %}" class="btn btn-outline-warning btn-sm" title="Initiate formal controlled revision">
+        <i class="bi bi-arrow-repeat me-1"></i>Initiate Revision
+      </a>
+      {% endif %}
+      <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-outline-dark btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Test Session
+      </a>
+    </div>
+  </div>
+
+  <!-- ── Superseded Notice (if applicable) ────────────────────────────────── -->
+  {% if report.is_superseded %}
+  <div class="alert alert-secondary d-flex gap-3 align-items-start mb-4 shadow-sm border-0 bg-light" role="alert">
+    <i class="bi bi-info-circle-fill fs-4 text-secondary flex-shrink-0 mt-1"></i>
+    <div class="small">
+      <h6 class="alert-heading fw-bold mb-1">Historical Superseded Version</h6>
+      <p class="mb-1 text-secondary">
+        This document version has been superseded by a newer approved revision. The historical file and original data snapshot are permanently preserved for ISO/IEC 17025 compliance.
+      </p>
+      {% if report.superseded_by %}
+      <div class="mt-2">
+        <a href="{% url 'reports:detail' report.superseded_by.pk %}" class="btn btn-sm btn-outline-dark">
+          <i class="bi bi-arrow-right-circle me-1"></i>View Superseding Revision ({{ report.superseded_by.report_number }})
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Row 1: Identification & Integrity ────────────────────────────────── -->
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+      <!-- Instrument Summary -->
+      <div class="card border-0 shadow-sm bg-white h-100">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <h6 class="mb-0 fw-bold text-dark">
+            <i class="bi bi-cpu text-primary me-2"></i>Instrument Under Test
+          </h6>
+          <a href="{% url 'instruments:detail' instrument.pk %}" class="btn btn-sm btn-outline-primary py-0 px-2 small">
+            View Instrument
+          </a>
+        </div>
+        <div class="card-body small">
+          <dl class="row mb-0">
+            <dt class="col-sm-5 text-muted">Instrument Name:</dt>
+            <dd class="col-sm-7 fw-bold text-dark">{{ instrument.display_name }}</dd>
+
+            <dt class="col-sm-5 text-muted">Manufacturer / Model:</dt>
+            <dd class="col-sm-7 text-dark">{{ instrument.manufacturer }} &mdash; {{ instrument.model_name|default:"—" }}</dd>
+
+            <dt class="col-sm-5 text-muted">Serial Number:</dt>
+            <dd class="col-sm-7 font-monospace fw-bold text-dark">{{ instrument.serial_number }}</dd>
+
+            <dt class="col-sm-5 text-muted">Accuracy Class:</dt>
+            <dd class="col-sm-7"><span class="badge bg-primary">{{ instrument.get_accuracy_class_display }}</span></dd>
+
+            <dt class="col-sm-5 text-muted">Capacity Range:</dt>
+            <dd class="col-sm-7 font-monospace text-dark">{{ instrument.min_capacity }} &mdash; {{ instrument.max_capacity }} {{ instrument.unit_of_measure }}</dd>
+
+            <dt class="col-sm-5 text-muted">Scale Intervals:</dt>
+            <dd class="col-sm-7 font-monospace text-dark">e = {{ instrument.actual_scale_interval }} {{ instrument.unit_of_measure }}, d = {{ instrument.scale_interval }} {{ instrument.unit_of_measure }}</dd>
+
+            <dt class="col-sm-5 text-muted">Client / Owner:</dt>
+            <dd class="col-sm-7 text-dark fw-medium">{{ instrument.customer_name|default:session.organization.name }}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <!-- Report Metadata & Cryptographic Integrity -->
+      <div class="card border-0 shadow-sm bg-white h-100">
+        <div class="card-header bg-white py-3 border-bottom">
+          <h6 class="mb-0 fw-bold text-dark">
+            <i class="bi bi-shield-lock text-primary me-2"></i>Report Identification &amp; Cryptographic Integrity
+          </h6>
+        </div>
+        <div class="card-body small">
+          <dl class="row mb-0">
+            <dt class="col-sm-5 text-muted">Unique Report ID:</dt>
+            <dd class="col-sm-7 font-monospace text-muted" style="font-size: 7.5pt;">{{ report.id }}</dd>
+
+            <dt class="col-sm-5 text-muted">Report Reference:</dt>
+            <dd class="col-sm-7 font-monospace fw-bold text-primary">{{ report.report_number }}</dd>
+
+            <dt class="col-sm-5 text-muted">Revision Number:</dt>
+            <dd class="col-sm-7">
+              <span class="badge bg-light text-dark border font-monospace">Revision {{ report.revision_number }}</span>
+              {% if report.revision_notes %}
+              <div class="text-muted mt-1 small"><em>{{ report.revision_notes }}</em></div>
+              {% endif %}
+            </dd>
+
+            <dt class="col-sm-5 text-muted">Format &amp; File:</dt>
+            <dd class="col-sm-7">
+              {% if report.report_type == 'PDF' %}
+              <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</span>
+              {% else %}
+              <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle"><i class="bi bi-file-earmark-word me-1"></i>Word (.docx)</span>
+              {% endif %}
+              <span class="text-muted ms-1 font-monospace" style="font-size: 7.5pt;">{{ report.file.name }}</span>
+            </dd>
+
+            <dt class="col-sm-5 text-muted">SHA-256 Checksum:</dt>
+            <dd class="col-sm-7">
+              <div class="p-1 px-2 bg-light rounded font-monospace text-dark text-break" style="font-size: 7pt;">
+                {{ report.checksum|default:"Integrity hash calculated upon generation" }}
+              </div>
+            </dd>
+
+            <dt class="col-sm-5 text-muted">Generated By:</dt>
+            <dd class="col-sm-7 text-dark fw-medium">
+              {{ report.generated_by.full_name|default:"System" }} &bull; {{ report.generated_at|date:"Y-m-d H:i:s" }}
+            </dd>
+
+            <dt class="col-sm-5 text-muted">Download Count:</dt>
+            <dd class="col-sm-7">
+              <span class="badge bg-info bg-opacity-10 text-info border border-info-subtle">{{ report.download_count }} Tracked Download(s)</span>
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Row 2: Point-in-time Metrological Data Snapshot ───────────────────── -->
+  <div class="card border-0 shadow-sm mb-4 bg-white">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-camera text-primary me-2"></i>Point-in-Time Metrological Data Snapshot
+      </h6>
+      <span class="badge bg-light text-dark border">ISO/IEC 17025 Traceability</span>
+    </div>
+    <div class="card-body p-4">
+      <p class="text-muted small mb-3">
+        Every approved report captures and archives the complete metrological state of the instrument and measurement observations at the exact instant of generation. This snapshot remains permanently immutable.
+      </p>
+
+      {% if snapshot %}
+      <div class="row g-3 small">
+        <div class="col-md-3">
+          <div class="p-3 bg-light rounded border h-100">
+            <span class="fw-bold text-dark d-block mb-1">Environmental Conditions</span>
+            <div class="text-muted">Temp: <strong class="text-dark">{{ snapshot.session.temperature_start }} &mdash; {{ snapshot.session.temperature_end }} &deg;C</strong></div>
+            <div class="text-muted">Humidity: <strong class="text-dark">{{ snapshot.session.humidity_start }} &mdash; {{ snapshot.session.humidity_end }} %RH</strong></div>
+            <div class="text-muted mt-1 text-truncate">Loc: {{ snapshot.session.test_location }}</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="p-3 bg-light rounded border h-100">
+            <span class="fw-bold text-dark d-block mb-1">Preliminary Examinations</span>
+            <div class="text-muted">Visual Markings: <strong class="{% if snapshot.session.initial_examination_passed %}text-success{% else %}text-danger{% endif %}">{% if snapshot.session.initial_examination_passed %}Satisfactory{% else %}Failed{% endif %}</strong></div>
+            <div class="text-muted">Zero-Setting: <strong class="{% if snapshot.session.zero_test_passed %}text-success{% else %}text-danger{% endif %}">{% if snapshot.session.zero_test_passed %}Within &plusmn;0.25e{% else %}Failed{% endif %}</strong></div>
+            <div class="text-muted mt-1">Standard: {{ snapshot.session.oiml_edition_display }}</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="p-3 bg-light rounded border h-100">
+            <span class="fw-bold text-dark d-block mb-1">Archived Observation Points</span>
+            <div class="text-muted">Weighing Points: <strong class="text-dark">{{ snapshot.counts.weighing_points }}</strong></div>
+            <div class="text-muted">Repeatability Points: <strong class="text-dark">{{ snapshot.counts.repeatability_points }}</strong></div>
+            <div class="text-muted">Eccentricity Points: <strong class="text-dark">{{ snapshot.counts.eccentricity_points }}</strong></div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="p-3 bg-light rounded border h-100">
+            <span class="fw-bold text-dark d-block mb-1">Metrological Verdict</span>
+            <div>Result: <strong class="{% if snapshot.session.overall_result == 'PASS' %}text-success{% else %}text-danger{% endif %}">{{ snapshot.session.overall_result }}</strong></div>
+            <div class="text-muted">Reviewer: <strong class="text-dark">{{ snapshot.session.reviewer }}</strong></div>
+            <div class="text-muted">Operator: <strong class="text-dark">{{ snapshot.session.technician }}</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Collapsible Raw JSON Data Snapshot Viewer -->
+      <div class="mt-3">
+        <a class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" href="#rawSnapshotJson" role="button" aria-expanded="false">
+          <i class="bi bi-code-slash me-1"></i>Inspect Raw JSON Data Snapshot
+        </a>
+        <div class="collapse mt-2" id="rawSnapshotJson">
+          <div class="card card-body bg-light border p-3 font-monospace" style="font-size: 7.5pt; max-height: 350px; overflow-y: auto;">
+            <pre class="mb-0">{{ snapshot|pprint }}</pre>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="alert alert-light text-muted small border mb-0">
+        Data snapshot will be compiled upon the next generation cycle.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Row 3: Approval History Timeline & Download Access Log ───────────── -->
+  <div class="row g-4 mb-4">
+    <!-- Approval History -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm bg-white h-100">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <h6 class="mb-0 fw-bold text-dark">
+            <i class="bi bi-diagram-3 text-primary me-2"></i>Approval &amp; Workflow Audit Ledger
+          </h6>
+          <span class="badge bg-secondary">{{ approval_history.count }} Step(s)</span>
+        </div>
+        <div class="card-body p-0 small">
+          <ul class="list-group list-group-flush">
+            {% for h in approval_history %}
+            <li class="list-group-item py-2 px-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="badge bg-light text-dark border">{{ h.get_action_display }}</span>
+                <small class="text-muted">{{ h.created_at|date:"Y-m-d H:i" }}</small>
+              </div>
+              <div class="text-secondary mt-1">
+                Action by: <strong class="text-dark">{{ h.actor.full_name|default:h.actor.username }}</strong>
+              </div>
+              {% if h.comments %}
+              <div class="p-1 px-2 bg-light rounded mt-1 font-monospace text-dark" style="font-size: 7.5pt;">
+                {{ h.comments }}
+              </div>
+              {% endif %}
+            </li>
+            {% empty %}
+            <li class="list-group-item text-center text-muted py-4">No approval history entries recorded.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Download Access Audit Log -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm bg-white h-100">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <h6 class="mb-0 fw-bold text-dark">
+            <i class="bi bi-cloud-arrow-down text-info me-2"></i>Download Access Audit Log
+          </h6>
+          <span class="badge bg-info">{{ download_logs.count }} Download(s)</span>
+        </div>
+        <div class="card-body p-0 small">
+          <div class="table-responsive" style="max-height: 380px;">
+            <table class="table table-hover align-middle mb-0 small">
+              <thead class="table-light text-secondary" style="font-size: 7.5pt;">
+                <tr>
+                  <th>Timestamp</th>
+                  <th>User</th>
+                  <th>Format</th>
+                  <th>IP Address</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for log in download_logs %}
+                <tr>
+                  <td class="font-monospace">{{ log.downloaded_at|date:"Y-m-d H:i:s" }}</td>
+                  <td>
+                    <span class="fw-medium text-dark">{{ log.user.full_name|default:"Anonymous/Direct" }}</span>
+                  </td>
+                  <td>
+                    {% if log.download_format == 'PDF' %}
+                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle" style="font-size: 7pt;">PDF</span>
+                    {% else %}
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle" style="font-size: 7pt;">Word</span>
+                    {% endif %}
+                  </td>
+                  <td class="font-monospace text-muted">{{ log.ip_address|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="4" class="text-center text-muted py-4">
+                    No downloads tracked yet for this report.
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+

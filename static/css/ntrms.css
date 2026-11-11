@@ -1,0 +1,755 @@
+/* ==========================================================================
+   NAWI Test Report Management System (NTRMS)
+   Enterprise Laboratory Information Management System (LIMS) Stylesheet
+   Conforming to OIML R 76-1:2006 & ISO/IEC 17025 Design Standards
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ── 1. Color Palette & Design Tokens ───────────────────────────────────── */
+:root {
+  /* Primary: Navy Blue */
+  --lims-navy-900: #090e1a;
+  --lims-navy-800: #0f172a;
+  --lims-navy-700: #1e293b;
+  --lims-navy-600: #334155;
+  --lims-primary: #0f172a;
+  --lims-primary-accent: #1e40af;
+
+  /* Secondary: Light Blue / Sky */
+  --lims-secondary: #0ea5e9;
+  --lims-secondary-hover: #0284c7;
+  --lims-secondary-light: #38bdf8;
+  --lims-secondary-soft: #e0f2fe;
+
+  /* Background & Cards */
+  --lims-bg: #f8fafc;
+  --lims-bg-alt: #f1f5f9;
+  --lims-card-bg: #ffffff;
+  --lims-border: #e2e8f0;
+  --lims-border-dark: #cbd5e1;
+
+  /* Functional Status Colors */
+  --lims-success: #10b981;
+  --lims-success-dark: #059669;
+  --lims-success-soft: #ecfdf5;
+  --lims-warning: #f59e0b;
+  --lims-warning-dark: #d97706;
+  --lims-warning-soft: #fffbeb;
+  --lims-error: #ef4444;
+  --lims-error-dark: #dc2626;
+  --lims-error-soft: #fef2f2;
+  --lims-info: #3b82f6;
+  --lims-info-soft: #eff6ff;
+
+  /* Typography & Shadows */
+  --lims-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --lims-font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --lims-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --lims-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.07), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  --lims-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --lims-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --lims-radius-sm: 6px;
+  --lims-radius: 10px;
+  --lims-radius-lg: 14px;
+}
+
+/* ── 2. Base Typography & Layout ────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--lims-font-sans);
+  background-color: var(--lims-bg);
+  color: var(--lims-navy-800);
+  padding-top: 60px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular numerals for metrological measurement precision */
+.font-monospace, code, kbd, pre, samp,
+.table-measurements td, .metrology-val {
+  font-family: var(--lims-font-mono) !important;
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--lims-navy-800);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+a {
+  color: var(--lims-secondary-hover);
+  text-decoration: none;
+  transition: color 0.15s ease-in-out;
+}
+a:hover {
+  color: var(--lims-primary-accent);
+}
+
+/* ── 3. Top Navbar ──────────────────────────────────────────────────────── */
+#topNavbar {
+  background: var(--lims-navy-900) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  height: 60px;
+  z-index: 1030;
+  backdrop-filter: blur(8px);
+}
+
+.navbar-brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
+  color: #ffffff !important;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand-badge {
+  background: linear-gradient(135deg, var(--lims-secondary) 0%, var(--lims-primary-accent) 100%);
+  color: #ffffff;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.35);
+}
+
+.nav-toggle-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-radius: var(--lims-radius-sm);
+  padding: 0.35rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+.nav-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+/* ── 4. Responsive Sidebar ──────────────────────────────────────────────── */
+#sidebar {
+  width: 255px;
+  height: calc(100vh - 60px);
+  background: var(--lims-navy-900);
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+  position: fixed;
+  top: 60px;
+  left: 0;
+  bottom: 0;
+  overflow-y: auto;
+  z-index: 1020;
+  padding: 0.75rem 0.6rem 2rem;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+#sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+#sidebar .nav-link {
+  color: #94a3b8;
+  padding: 0.62rem 0.95rem;
+  margin: 2px 0;
+  border-radius: 8px;
+  transition: all 0.15s ease-in-out;
+  font-size: 0.86rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  position: relative;
+}
+
+#sidebar .nav-link i {
+  font-size: 1.05rem;
+  color: #64748b;
+  transition: color 0.15s ease;
+}
+
+#sidebar .nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+#sidebar .nav-link:hover i {
+  color: var(--lims-secondary-light);
+}
+
+#sidebar .nav-link.active {
+  background: rgba(14, 165, 233, 0.15);
+  color: #ffffff;
+  font-weight: 600;
+  border-left: 3px solid var(--lims-secondary);
+}
+#sidebar .nav-link.active i {
+  color: var(--lims-secondary);
+}
+
+#sidebar .sidebar-heading {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  text-transform: uppercase;
+  padding: 1.15rem 0.95rem 0.4rem;
+}
+
+/* Page content wrapper with sidebar offset */
+#page-content-wrapper {
+  flex: 1;
+  min-height: calc(100vh - 60px);
+  background-color: var(--lims-bg);
+  transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#page-content-wrapper.with-sidebar {
+  margin-left: 255px;
+}
+
+/* Backdrop for Mobile Sidebar */
+.sidebar-backdrop {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(3px);
+  z-index: 1015;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.sidebar-backdrop.show {
+  display: block;
+  opacity: 1;
+}
+
+/* Responsive behavior for mobile & tablets */
+@media (max-width: 991.98px) {
+  #sidebar {
+    transform: translateX(-100%);
+    box-shadow: var(--lims-shadow-lg);
+  }
+  #sidebar.show {
+    transform: translateX(0);
+  }
+  #page-content-wrapper.with-sidebar {
+    margin-left: 0 !important;
+  }
+}
+
+/* Desktop Collapsed Sidebar state */
+body.sidebar-collapsed #sidebar {
+  width: 70px;
+}
+body.sidebar-collapsed #sidebar .nav-link span,
+body.sidebar-collapsed #sidebar .sidebar-heading,
+body.sidebar-collapsed #sidebar .sidebar-badge {
+  display: none;
+}
+body.sidebar-collapsed #sidebar .nav-link {
+  justify-content: center;
+  padding: 0.75rem 0;
+}
+body.sidebar-collapsed #page-content-wrapper.with-sidebar {
+  margin-left: 70px;
+}
+
+/* ── 5. Enterprise Cards & Panels ───────────────────────────────────────── */
+.card {
+  background: var(--lims-card-bg);
+  border: 1px solid var(--lims-border);
+  border-radius: var(--lims-radius);
+  box-shadow: var(--lims-shadow);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+  border-color: #cbd5e1;
+}
+
+.card-header {
+  background: var(--lims-card-bg);
+  border-bottom: 1px solid var(--lims-border);
+  font-weight: 600;
+  font-size: 0.92rem;
+  padding: 0.95rem 1.25rem;
+  color: var(--lims-navy-800);
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+/* ── 6. KPI Metric Cards ────────────────────────────────────────────────── */
+.kpi-card {
+  background: var(--lims-card-bg);
+  border: 1px solid var(--lims-border);
+  border-radius: var(--lims-radius);
+  padding: 1.25rem;
+  box-shadow: var(--lims-shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--lims-shadow-md);
+  border-color: var(--lims-secondary-light);
+}
+
+.kpi-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.kpi-value {
+  font-size: 1.85rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  color: var(--lims-navy-900);
+}
+
+.kpi-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--lims-navy-600);
+  margin-bottom: 0.25rem;
+}
+
+/* ── 7. Action Shortcuts ────────────────────────────────────────────────── */
+.action-card {
+  background: var(--lims-card-bg);
+  border: 1px solid var(--lims-border);
+  border-radius: var(--lims-radius);
+  padding: 1rem 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  text-decoration: none;
+  box-shadow: var(--lims-shadow-sm);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.action-card:hover {
+  border-color: var(--lims-secondary);
+  background: var(--lims-secondary-soft);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.12);
+}
+
+/* ── 8. Search & Filter Consoles ────────────────────────────────────────── */
+.filter-bar {
+  background: var(--lims-card-bg);
+  border: 1px solid var(--lims-border);
+  border-radius: var(--lims-radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--lims-shadow-sm);
+}
+
+/* ── 9. Professional Tables ─────────────────────────────────────────────── */
+.table-responsive {
+  border-radius: var(--lims-radius);
+}
+
+.table {
+  margin-bottom: 0;
+  color: var(--lims-navy-800);
+}
+
+.table th {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lims-navy-600);
+  background-color: var(--lims-bg-alt);
+  border-bottom: 1px solid var(--lims-border);
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 0.8rem 1rem;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.86rem;
+}
+
+.table-hover tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+/* Metrological Row Status Tints */
+tr.row-pass {
+  background-color: var(--lims-success-soft) !important;
+}
+tr.row-fail {
+  background-color: var(--lims-error-soft) !important;
+}
+tr.row-warning {
+  background-color: var(--lims-warning-soft) !important;
+}
+
+/* ── 10. Buttons & Controls ─────────────────────────────────────────────── */
+.btn {
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: -0.01em;
+  padding: 0.52rem 0.95rem;
+  border-radius: var(--lims-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: all 0.15s ease-in-out;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  border-radius: 5px;
+}
+
+.btn-lg {
+  padding: 0.75rem 1.4rem;
+  font-size: 0.95rem;
+  border-radius: 8px;
+}
+
+/* Navy Primary Button */
+.btn-primary {
+  background-color: var(--lims-navy-800);
+  border-color: var(--lims-navy-800);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.18);
+}
+.btn-primary:hover, .btn-primary:focus {
+  background-color: var(--lims-navy-900);
+  border-color: var(--lims-navy-900);
+  color: #ffffff;
+  box-shadow: 0 4px 8px rgba(15, 23, 42, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Light Blue Secondary Button */
+.btn-secondary, .btn-info {
+  background-color: var(--lims-secondary);
+  border-color: var(--lims-secondary);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(14, 165, 233, 0.2);
+}
+.btn-secondary:hover, .btn-info:hover {
+  background-color: var(--lims-secondary-hover);
+  border-color: var(--lims-secondary-hover);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.btn-outline-primary {
+  color: var(--lims-navy-800);
+  border-color: var(--lims-navy-800);
+}
+.btn-outline-primary:hover {
+  background-color: var(--lims-navy-800);
+  color: #ffffff;
+}
+
+/* Functional Accent Buttons */
+.btn-success {
+  background-color: var(--lims-success);
+  border-color: var(--lims-success);
+  color: #ffffff;
+}
+.btn-success:hover {
+  background-color: var(--lims-success-dark);
+  border-color: var(--lims-success-dark);
+}
+
+.btn-warning {
+  background-color: var(--lims-warning);
+  border-color: var(--lims-warning);
+  color: #ffffff;
+}
+.btn-warning:hover {
+  background-color: var(--lims-warning-dark);
+  border-color: var(--lims-warning-dark);
+}
+
+.btn-danger {
+  background-color: var(--lims-error);
+  border-color: var(--lims-error);
+  color: #ffffff;
+}
+.btn-danger:hover {
+  background-color: var(--lims-error-dark);
+  border-color: var(--lims-error-dark);
+}
+
+/* ── 11. Form Inputs & Interactive Validation ───────────────────────────── */
+.form-control, .form-select {
+  border: 1px solid var(--lims-border);
+  border-radius: var(--lims-radius-sm);
+  padding: 0.52rem 0.85rem;
+  font-size: 0.88rem;
+  color: var(--lims-navy-800);
+  background-color: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: var(--lims-secondary);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+  outline: 0;
+}
+
+.form-label {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--lims-navy-700);
+  margin-bottom: 0.35rem;
+}
+
+.form-text {
+  font-size: 0.76rem;
+  color: var(--lims-navy-600);
+}
+
+.required-asterisk, label .asteriskField {
+  color: var(--lims-error) !important;
+  font-weight: 700;
+}
+
+/* ── 12. Badges & Status Indicators ─────────────────────────────────────── */
+.badge {
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  padding: 0.35em 0.65em;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+/* Soft Enterprise Status Badges */
+.badge-soft-success {
+  background-color: var(--lims-success-soft);
+  color: var(--lims-success-dark);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.badge-soft-warning {
+  background-color: var(--lims-warning-soft);
+  color: var(--lims-warning-dark);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.badge-soft-danger {
+  background-color: var(--lims-error-soft);
+  color: var(--lims-error-dark);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.badge-soft-info {
+  background-color: var(--lims-secondary-soft);
+  color: var(--lims-secondary-hover);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+}
+.badge-soft-primary {
+  background-color: #f1f5f9;
+  color: var(--lims-navy-800);
+  border: 1px solid var(--lims-border);
+}
+
+/* ── 13. Avatar Circles ─────────────────────────────────────────────────── */
+.avatar-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.avatar-circle.avatar-lg {
+  width: 68px;
+  height: 68px;
+  font-size: 1.5rem;
+}
+
+/* ── 14. Wizard Stepper ─────────────────────────────────────────────────── */
+.wizard-progress {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  margin: 0.5rem 0;
+}
+
+.wizard-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  z-index: 2;
+  position: relative;
+  transition: transform 0.15s ease;
+}
+
+.wizard-step:hover {
+  transform: translateY(-1px);
+}
+
+.step-num {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--lims-border);
+  color: var(--lims-navy-600);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.step-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lims-navy-600);
+  margin-top: 0.35rem;
+  text-align: center;
+}
+
+.wizard-step.active .step-num {
+  background: var(--lims-secondary);
+  border-color: var(--lims-secondary);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.2);
+}
+.wizard-step.active .step-label {
+  color: var(--lims-navy-900);
+  font-weight: 700;
+}
+
+.wizard-step.completed .step-num {
+  background: var(--lims-success);
+  border-color: var(--lims-success);
+  color: #ffffff;
+}
+
+.wizard-line {
+  flex: 1;
+  height: 3px;
+  background: var(--lims-border);
+  margin: 0 8px;
+  margin-bottom: 22px;
+  z-index: 1;
+}
+
+.wizard-line.active {
+  background: var(--lims-secondary);
+}
+
+/* ── 15. Breadcrumbs ────────────────────────────────────────────────────── */
+.breadcrumb {
+  margin-bottom: 0.5rem;
+  font-size: 0.82rem;
+}
+.breadcrumb-item a {
+  color: var(--lims-navy-600);
+  text-decoration: none;
+}
+.breadcrumb-item a:hover {
+  color: var(--lims-secondary);
+}
+.breadcrumb-item.active {
+  color: var(--lims-navy-800);
+  font-weight: 600;
+}
+
+/* ── 16. Alert Messages Container ───────────────────────────────────────── */
+.messages-container {
+  margin-bottom: 1.25rem;
+}
+.alert {
+  border-radius: var(--lims-radius-sm);
+  font-size: 0.86rem;
+  border: 0;
+  box-shadow: var(--lims-shadow-sm);
+}
+
+/* ── 17. Modal Dialogs ──────────────────────────────────────────────────── */
+.modal-content {
+  border: 0;
+  border-radius: var(--lims-radius-lg);
+  box-shadow: var(--lims-shadow-lg);
+  overflow: hidden;
+}
+
+.modal-header {
+  background: var(--lims-bg-alt);
+  border-bottom: 1px solid var(--lims-border);
+  padding: 1rem 1.4rem;
+}
+
+.modal-footer {
+  background: var(--lims-bg-alt);
+  border-top: 1px solid var(--lims-border);
+  padding: 0.85rem 1.4rem;
+}
+
+/* ── 18. Print Media Stylesheet ─────────────────────────────────────────── */
+@media print {
+  #sidebar, #topNavbar, .filter-bar, .footer, .btn, .alert, .breadcrumb,
+  .sidebar-backdrop {
+    display: none !important;
+  }
+  #page-content-wrapper {
+    margin-left: 0 !important;
+  }
+  body {
+    padding-top: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 9pt !important;
+  }
+  .card {
+    border: 1px solid #cccccc !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+}

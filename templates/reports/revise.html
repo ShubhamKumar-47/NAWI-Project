@@ -1,0 +1,115 @@
+{% extends "base/_base.html" %}
+{% block title %}Initiate Controlled Revision — {{ session.session_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0" style="max-width: 850px;">
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-2 small">
+      <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'test_sessions:detail' session.pk %}">{{ session.session_number }}</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Initiate Controlled Revision</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-arrow-repeat text-warning me-2"></i>Initiate Controlled Revision
+      </h4>
+      <p class="text-muted small mb-0 mt-1">
+        Formal change-control protocol under ISO/IEC 17025 and legal metrology quality standards.
+      </p>
+    </div>
+  </div>
+
+  <!-- Warning Banner -->
+  <div class="alert alert-warning border-0 shadow-sm d-flex gap-3 align-items-start mb-4" role="alert">
+    <i class="bi bi-shield-exclamation text-warning fs-3 flex-shrink-0 mt-1"></i>
+    <div class="small">
+      <h6 class="alert-heading fw-bold mb-1">Controlled Change-Control Protocol (OIML R 76 §A.3)</h6>
+      <p class="mb-1 text-secondary">
+        Approved test records and certificates are legally protected against direct mutation. Initiating this controlled revision will:
+      </p>
+      <ul class="mb-0 ps-3 text-secondary">
+        <li>Permanently archive the current reports and point-in-time data snapshots.</li>
+        <li>Mark current reports as <strong>superseded</strong> (historical versions are never overwritten).</li>
+        <li>Increment the revision counter to <strong>Revision #{{ session.revision_number|add:1 }}</strong>.</li>
+        <li>Unlock the observation tables so laboratory technicians can enter corrected or remedial measurements.</li>
+        <li>Require formal re-review and re-approval before new certificates can be issued.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm bg-white mb-4">
+    <div class="card-header bg-white py-3 border-bottom">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-info-circle text-primary me-2"></i>Record &amp; Active Report Identification
+      </h6>
+    </div>
+    <div class="card-body p-4 small">
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <div class="p-3 bg-light rounded border">
+            <span class="text-muted text-uppercase fw-semibold" style="font-size: 7.5pt;">Test Record</span>
+            <div class="fw-bold text-dark fs-6 mt-1">{{ session.session_number }}</div>
+            <div class="text-muted">Instrument: <strong>{{ session.instrument.display_name }}</strong></div>
+            <div class="text-muted">Serial Number: <span class="font-monospace text-dark">{{ session.instrument.serial_number }}</span></div>
+            <div class="text-muted">Current Revision: <strong class="badge bg-secondary">Rev #{{ session.revision_number }}</strong></div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="p-3 bg-light rounded border">
+            <span class="text-muted text-uppercase fw-semibold" style="font-size: 7.5pt;">Target Revision</span>
+            <div class="fw-bold text-primary fs-6 mt-1">Revision #{{ session.revision_number|add:1 }}</div>
+            <div class="text-muted">Current Status: <strong class="badge bg-success">{{ session.get_status_display }}</strong></div>
+            <div class="text-muted">Action Authority: <strong class="text-dark">{{ request.user.full_name }}</strong></div>
+            <div class="text-muted">Standards: <span class="text-dark">{{ session.get_oiml_edition_display }}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Revision Form -->
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label for="revision_reason" class="form-label fw-bold text-dark">
+            Formal Change-Control Justification / Remediation Notes <span class="text-danger">*</span>
+          </label>
+          <textarea
+            name="revision_reason"
+            id="revision_reason"
+            rows="4"
+            class="form-control"
+            placeholder="Provide a detailed technical justification for reopening this approved record (e.g., typographical amendment, environmental correction, recalibrated test load point, client remediation request)..."
+            required
+            minlength="15"
+          ></textarea>
+          <div class="form-text text-muted">
+            Minimum 15 characters required. This justification is permanently recorded in the audit ledger and printed on revised certificates.
+          </div>
+        </div>
+
+        <div class="form-check mb-4">
+          <input class="form-check-input" type="checkbox" id="confirm_revision" required>
+          <label class="form-check-label text-dark small" for="confirm_revision">
+            I confirm that this controlled revision complies with institutional quality management guidelines and legal metrology standards.
+          </label>
+        </div>
+
+        <div class="d-flex gap-2 pt-3 border-top">
+          <button type="submit" class="btn btn-warning px-4 fw-semibold">
+            <i class="bi bi-arrow-repeat me-1"></i>Confirm &amp; Initiate Revision #{{ session.revision_number|add:1 }}
+          </button>
+          <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-link text-decoration-none">
+            Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+

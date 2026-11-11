@@ -1,0 +1,116 @@
+{% extends "base/_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+{% if is_create %}Register Instrument — NAWI TRMS{% else %}Edit Instrument — {{ form.instance.display_name }}{% endif %}
+{% endblock %}
+
+{% block breadcrumb %}
+{% if is_create %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"Instruments","url":"/instruments/"},{"label":"Register Instrument"}]'|safe %}
+{% else %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"Instruments","url":"/instruments/"},{"label":"Edit Instrument"}]'|safe %}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-10">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h4 class="mb-1 fw-bold text-dark">
+          <i class="bi bi-tools text-primary me-2"></i>
+          {% if form.instance.pk %}Edit Instrument: {{ form.instance.display_name }}{% else %}Register New Weighing Instrument{% endif %}
+        </h4>
+        <p class="text-muted small mb-0">
+          Enter identification, metrological specifications, and laboratory tracking details per OIML Recommendation R 76.
+        </p>
+      </div>
+      <a href="{% if form.instance.pk %}{% url 'instruments:detail' form.instance.pk %}{% else %}{% url 'instruments:list' %}{% endif %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x-lg me-1"></i>Cancel
+      </a>
+    </div>
+
+    <!-- OIML R 76 Advisory Alert -->
+    <div class="alert alert-info border-info d-flex gap-3 align-items-start shadow-sm mb-4" role="alert">
+      <i class="bi bi-shield-check fs-4 text-info flex-shrink-0 mt-1"></i>
+      <div>
+        <h6 class="alert-heading fw-bold mb-1">OIML R 76 Metrological Integrity Advisory</h6>
+        <p class="small mb-0">
+          Ensure that <strong>Max</strong>, <strong>Min</strong>, <strong>d</strong>, and <strong>e</strong> match the instrument's pattern approval certificate and manufacturer nameplate. Verification interval (<strong>e</strong>) determines the applicable MPE zones. Actual scale interval (<strong>d</strong>) must satisfy <code>d &le; e</code>.
+        </p>
+      </div>
+    </div>
+
+    <!-- Datalist for common instrument categories -->
+    <datalist id="instrument-types-datalist">
+      <option value="Analytical Balance">Analytical Balance (Class I/II)</option>
+      <option value="Precision Balance">Precision Balance (Class I/II)</option>
+      <option value="Bench Scale">Bench Scale (Class III)</option>
+      <option value="Platform Scale">Platform Scale (Class III)</option>
+      <option value="Retail / Price-Computing Scale">Retail / Price-Computing Scale</option>
+      <option value="Crane Scale">Crane Scale (Class III)</option>
+      <option value="Weighbridge / Truck Scale">Weighbridge / Truck Scale (Class III/IIII)</option>
+      <option value="Hopper / Tank Scale">Hopper / Tank Scale</option>
+      <option value="Mechanical Scale">Mechanical Scale</option>
+      <option value="Hybrid Scale">Hybrid Scale</option>
+    </datalist>
+
+    <!-- Crispy Form Card -->
+    <div class="card shadow-sm border-0 mb-5">
+      <div class="card-body p-4">
+        {% crispy form %}
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const maxInput = document.getElementById("id_max_capacity");
+  const minInput = document.getElementById("id_min_capacity");
+  const dInput = document.getElementById("id_scale_interval");
+  const eInput = document.getElementById("id_actual_scale_interval");
+  const nInput = document.getElementById("id_n_max");
+  const btnCalcN = document.getElementById("btn-calc-n");
+  const btnCopyDToE = document.getElementById("btn-copy-d-to-e");
+
+  // Helper: auto-calculate n = Max / e
+  function calculateN() {
+    if (!maxInput || !eInput || !nInput) return;
+    const maxVal = parseFloat(maxInput.value);
+    const eVal = parseFloat(eInput.value);
+    if (!isNaN(maxVal) && !isNaN(eVal) && eVal > 0) {
+      nInput.value = Math.floor(maxVal / eVal);
+    }
+  }
+
+  if (btnCalcN) {
+    btnCalcN.addEventListener("click", calculateN);
+  }
+
+  // Helper: Set e = d
+  if (btnCopyDToE) {
+    btnCopyDToE.addEventListener("click", function () {
+      if (dInput && eInput && dInput.value) {
+        eInput.value = dInput.value;
+        calculateN();
+      }
+    });
+  }
+
+  // Auto-calculate n when e changes if n is blank
+  if (eInput) {
+    eInput.addEventListener("blur", function () {
+      if (nInput && !nInput.value) {
+        calculateN();
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base/_base.html" %}
+{% load crispy_forms_tags %}
+{% block title %}{% if form.instance.pk %}Edit User{% else %}Add User{% endif %}{% endblock %}
+{% block breadcrumb %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"Users","url":"/accounts/users/"},{"label":"New User"}]'|safe %}
+{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header">
+    <h5 class="mb-0"><i class="bi bi-person-plus me-2"></i>
+      {% if form.instance.pk %}Edit User{% else %}Create New User{% endif %}
+    </h5>
+  </div>
+  <div class="card-body p-4">
+    {% crispy form %}
+  </div>
+</div>
+{% endblock %}

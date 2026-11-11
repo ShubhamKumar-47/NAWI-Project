@@ -1,0 +1,373 @@
+{% extends "base/_base.html" %}
+{% block title %}{{ instrument.display_name }} (S/N: {{ instrument.serial_number }}) — Spec Sheet{% endblock %}
+
+{% block breadcrumb %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"Instruments","url":"/instruments/"},{"label":"Detail & History"}]'|safe %}
+{% endblock %}
+
+{% block content %}
+<!-- ── Top Action Header ────────────────────────────────────────────────── -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <h4 class="mb-0 fw-bold text-dark">{{ instrument.display_name }}</h4>
+      {% include "components/_status_badge.html" with status=instrument.status %}
+      {% if instrument.accuracy_class == 'I' %}
+      <span class="badge bg-purple text-white" style="background-color: #6f42c1;">Class I</span>
+      {% elif instrument.accuracy_class == 'II' %}
+      <span class="badge bg-info text-dark">Class II</span>
+      {% elif instrument.accuracy_class == 'III' %}
+      <span class="badge bg-primary">Class III</span>
+      {% elif instrument.accuracy_class == 'IIII' %}
+      <span class="badge bg-warning text-dark">Class IIII</span>
+      {% endif %}
+    </div>
+    <div class="text-muted small">
+      <span class="font-monospace me-3"><i class="bi bi-upc-scan me-1"></i>S/N: <strong>{{ instrument.serial_number }}</strong></span>
+      {% if instrument.lab_reference_number %}
+      <span class="font-monospace me-3"><i class="bi bi-tag me-1"></i>Ref: <strong>{{ instrument.lab_reference_number }}</strong></span>
+      {% endif %}
+      <span><i class="bi bi-building me-1"></i>{{ instrument.organization.name }}</span>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 flex-wrap">
+    {% if can_edit_instrument %}
+    <a href="{% url 'instruments:edit' instrument.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-pencil me-1"></i>Edit Instrument
+    </a>
+    {% endif %}
+    <a href="{% url 'test_sessions:create' %}?instrument={{ instrument.pk }}" class="btn btn-primary btn-sm shadow-sm">
+      <i class="bi bi-clipboard2-plus me-1"></i>New Test Session
+    </a>
+    {% if can_delete_instrument %}
+    <a href="{% url 'instruments:delete' instrument.pk %}" class="btn btn-outline-danger btn-sm" title="Delete instrument">
+      <i class="bi bi-trash me-1"></i>Delete
+    </a>
+    {% endif %}
+    <a href="{% url 'instruments:list' %}" class="btn btn-outline-dark btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Registry
+    </a>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- ── Left Column: Metrological Parameters & Identification ─────────── -->
+  <div class="col-lg-8">
+
+    <!-- Card 1: Metrological Characteristics (OIML R 76) -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-rulers text-primary me-2"></i>Metrological Characteristics (OIML R 76)
+        </h6>
+        <span class="badge bg-light text-dark font-monospace border">
+          Unit: {{ instrument.unit_of_measurement }}
+        </span>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <!-- Max Capacity -->
+          <div class="col-sm-6 col-md-4">
+            <div class="p-3 bg-light rounded text-center">
+              <span class="text-muted small d-block">Max Capacity (Max)</span>
+              <span class="fs-4 fw-bold font-monospace text-primary">
+                {{ instrument.max_capacity }}
+              </span>
+              <small class="text-muted ms-1">{{ instrument.unit_of_measurement }}</small>
+            </div>
+          </div>
+
+          <!-- Min Capacity -->
+          <div class="col-sm-6 col-md-4">
+            <div class="p-3 bg-light rounded text-center">
+              <span class="text-muted small d-block">Min Capacity (Min)</span>
+              <span class="fs-4 fw-bold font-monospace text-dark">
+                {{ instrument.min_capacity }}
+              </span>
+              <small class="text-muted ms-1">{{ instrument.unit_of_measurement }}</small>
+            </div>
+          </div>
+
+          <!-- Number of Verification Intervals (n) -->
+          <div class="col-sm-6 col-md-4">
+            <div class="p-3 bg-light rounded text-center">
+              <span class="text-muted small d-block">Intervals (n = Max / e)</span>
+              <span class="fs-4 fw-bold font-monospace text-success">
+                {{ instrument.n_max|default:"—" }}
+              </span>
+              <small class="text-muted ms-1">intervals</small>
+            </div>
+          </div>
+
+          <!-- Verification Scale Interval (e) -->
+          <div class="col-sm-6">
+            <div class="p-3 border rounded">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="fw-semibold text-dark">Verification Scale Interval (e)</span>
+                <span class="badge bg-primary bg-opacity-10 text-primary font-monospace">OIML Table 1 MPE</span>
+              </div>
+              <div class="fs-4 font-monospace fw-bold text-dark mt-1">
+                {{ instrument.actual_scale_interval }} {{ instrument.unit_of_measurement }}
+              </div>
+              <small class="text-muted">Used for tolerance limits &amp; MPE evaluation per OIML R 76.</small>
+            </div>
+          </div>
+
+          <!-- Actual Scale Interval (d) -->
+          <div class="col-sm-6">
+            <div class="p-3 border rounded">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="fw-semibold text-dark">Actual Scale Interval (d)</span>
+                {% if instrument.e_equals_d %}
+                <span class="badge bg-success bg-opacity-10 text-success font-monospace">d = e</span>
+                {% else %}
+                <span class="badge bg-info bg-opacity-10 text-info font-monospace">d &lt; e (Auxiliary)</span>
+                {% endif %}
+              </div>
+              <div class="fs-4 font-monospace fw-bold text-dark mt-1">
+                {{ instrument.scale_interval }} {{ instrument.unit_of_measurement }}
+              </div>
+              <small class="text-muted">Smallest display difference between consecutive values.</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-light border mt-3 mb-0 small text-muted d-flex align-items-center">
+          <i class="bi bi-info-circle-fill text-info me-2 fs-5"></i>
+          <div>
+            <strong>Compliance Note:</strong> Verification interval <code>e={{ instrument.actual_scale_interval }} {{ instrument.unit_of_measurement }}</code> governs all maximum permissible error (MPE) thresholds across Weighing, Repeatability, Eccentricity, and Tare tests.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Instrument Identification & Spec Sheet -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-info-circle text-primary me-2"></i>Identification &amp; Technical Specifications
+        </h6>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-striped table-borderless mb-0">
+          <tbody>
+            <tr>
+              <th class="ps-4 text-muted fw-semibold" style="width: 35%;">Instrument Name</th>
+              <td class="fw-semibold text-dark">{{ instrument.instrument_name|default:instrument.display_name }}</td>
+            </tr>
+            <tr>
+              <th class="ps-4 text-muted fw-semibold">Manufacturer</th>
+              <td class="text-dark">{{ instrument.manufacturer }}</td>
+            </tr>
+            <tr>
+              <th class="ps-4 text-muted fw-semibold">Model Name / Designation</th>
+              <td class="text-dark">{{ instrument.model_name }}</td>
+            </tr>
+            <tr>
+              <th class="ps-4 text-muted fw-semibold">Model Number</th>
+              <td class="font-monospace text-dark">{{ instrument.model_number|default:"—" }}</td>
+            </tr>
+            <tr>
+              <th class="ps-4 text-muted fw-semibold">Serial Number</th>
+              <td class="font-monospace fw-bold text-primary">{{ instrument.serial_number }}</td>
+            </tr>
+            <tr>
+              <th class="ps-4 text-muted fw-semibold">Instrument Type</th>
+              <td>{{ instrument.instrument_type|default:"Standard NAWI" }}</td>
+            </tr>
+            <tr>
+              <th class="ps-4 text-muted fw-semibold">Year of Manufacture</th>
+              <td>{{ instrument.year_of_manufacture|default:"—" }}</td>
+            </tr>
+            <tr>
+              <th class="ps-4 text-muted fw-semibold">Pattern Approval Number</th>
+              <td class="font-monospace">{{ instrument.approval_number|default:"—" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Card 3: Associated Test Records & History -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <div>
+          <h6 class="mb-0 fw-bold text-dark">
+            <i class="bi bi-clipboard2-data text-primary me-2"></i>Instrument Test History &amp; Records
+          </h6>
+          <small class="text-muted">Historical OIML R 76 calibration sessions for this instrument</small>
+        </div>
+        <span class="badge bg-primary rounded-pill px-3 py-2">
+          {{ total_sessions }} Session{{ total_sessions|pluralize }}
+        </span>
+      </div>
+      <div class="card-body p-0">
+        {% if test_sessions %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light small text-uppercase text-muted border-bottom">
+              <tr>
+                <th class="ps-3">Session Number</th>
+                <th>Test Date</th>
+                <th>Operator</th>
+                <th>Status</th>
+                <th>Reviewer</th>
+                <th class="text-end pe-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in test_sessions %}
+              <tr>
+                <td class="ps-3 font-monospace fw-bold">
+                  <a href="{% url 'test_sessions:detail' s.pk %}" class="text-decoration-none">
+                    {{ s.session_number }}
+                  </a>
+                </td>
+                <td class="small">{{ s.test_date|date:"d M Y" }}</td>
+                <td class="small">
+                  {% if s.technician %}{{ s.technician.get_full_name|default:s.technician.username }}{% else %}—{% endif %}
+                </td>
+                <td>
+                  {% include "components/_status_badge.html" with status=s.status %}
+                </td>
+                <td class="small text-muted">
+                  {% if s.reviewer %}{{ s.reviewer.get_full_name|default:s.reviewer.username }}{% else %}—{% endif %}
+                </td>
+                <td class="text-end pe-3 text-nowrap">
+                  <a href="{% url 'test_sessions:detail' s.pk %}" class="btn btn-sm btn-outline-primary" title="View Session">
+                    <i class="bi bi-eye me-1"></i>View
+                  </a>
+                  <a href="{% url 'reports:generate' s.pk %}?format=pdf" class="btn btn-sm btn-outline-secondary" title="View/Download Report">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+          <i class="bi bi-clipboard-x fs-1 text-muted d-block mb-2"></i>
+          <h6 class="fw-bold">No Test Records Found</h6>
+          <p class="small text-muted mb-3">No calibration or verification sessions have been recorded for this instrument yet.</p>
+          <a href="{% url 'test_sessions:create' %}?instrument={{ instrument.pk }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Create First Test Session
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Right Column: Ownership, Location, Description, Photo ─────────── -->
+  <div class="col-lg-4">
+
+    <!-- Card 4: Additional Information & Ownership -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-building text-primary me-2"></i>Ownership &amp; Location
+        </h6>
+      </div>
+      <div class="card-body">
+        <dl class="mb-0 small">
+          <dt class="text-muted">Owner / Client Name</dt>
+          <dd class="fw-semibold text-dark mb-3">{{ instrument.customer_name|default:"Internal Metrology Lab" }}</dd>
+
+          <dt class="text-muted">Laboratory Reference #</dt>
+          <dd class="font-monospace fw-semibold text-dark mb-3">{{ instrument.lab_reference_number|default:"—" }}</dd>
+
+          <dt class="text-muted">Physical Location / Bay</dt>
+          <dd class="text-dark mb-3">
+            {% if instrument.location %}
+            <i class="bi bi-geo-alt text-danger me-1"></i>{{ instrument.location }}
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </dd>
+
+          <dt class="text-muted">Registration Date</dt>
+          <dd class="text-dark mb-3">{{ instrument.registration_date|date:"d M Y"|default:"—" }}</dd>
+
+          <dt class="text-muted">Physical Received Date</dt>
+          <dd class="text-dark mb-0">{{ instrument.received_date|date:"d M Y"|default:"—" }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Card 5: Photo (if uploaded) -->
+    {% if instrument.photo %}
+    <div class="card shadow-sm border-0 mb-4 overflow-hidden">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-camera text-primary me-2"></i>Instrument Photo
+        </h6>
+      </div>
+      <div class="card-body p-0 text-center bg-light">
+        <img
+          src="{{ instrument.photo.url }}"
+          class="img-fluid"
+          alt="{{ instrument.display_name }}"
+          style="max-height: 260px; object-fit: contain;"
+        >
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Card 6: Instrument Description & Pan Details -->
+    {% if instrument.description %}
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-file-text text-primary me-2"></i>Instrument Description
+        </h6>
+      </div>
+      <div class="card-body small text-secondary">
+        {{ instrument.description|linebreaks }}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Card 7: Notes -->
+    {% if instrument.notes %}
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-sticky text-primary me-2"></i>Administrative Notes
+        </h6>
+      </div>
+      <div class="card-body small text-muted">
+        {{ instrument.notes|linebreaks }}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Card 8: Audit Tracking -->
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-clock-history text-primary me-2"></i>System Audit
+        </h6>
+      </div>
+      <div class="card-body small text-muted">
+        <div class="mb-2">
+          <i class="bi bi-person me-1"></i>Registered by:
+          <strong class="text-dark">{% if instrument.created_by %}{{ instrument.created_by.get_full_name|default:instrument.created_by.username }}{% else %}System{% endif %}</strong>
+        </div>
+        <div class="mb-2">
+          <i class="bi bi-calendar-plus me-1"></i>Created:
+          <span class="text-dark">{{ instrument.created_at|date:"d M Y, H:i" }}</span>
+        </div>
+        <div>
+          <i class="bi bi-arrow-repeat me-1"></i>Last Updated:
+          <span class="text-dark">{{ instrument.updated_at|date:"d M Y, H:i" }}</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

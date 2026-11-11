@@ -1,0 +1,654 @@
+{% extends "base/_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+{% if is_create %}New Test Record Wizard — Step-by-Step Configuration{% else %}Edit Test Record — {{ session.session_number }}{% endif %}
+{% endblock %}
+
+{% block breadcrumb %}
+{% if is_create %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"Test Sessions","url":"/sessions/"},{"label":"New Test Record Wizard"}]'|safe %}
+{% else %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"Test Sessions","url":"/sessions/"},{"label":"Edit Test Record"}]'|safe %}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-11">
+
+    <!-- Top Heading -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h4 class="mb-1 fw-bold text-dark">
+          <i class="bi bi-clipboard2-check text-primary me-2"></i>
+          {% if is_create %}New NAWI Test Record Wizard{% else %}Edit Test Record: {{ session.session_number }}{% endif %}
+        </h4>
+        <p class="text-muted small mb-0">
+          Configure instrument under test, environmental conditions, and applicable OIML R 76 test procedures.
+        </p>
+      </div>
+      <a href="{% if not is_create %}{% url 'test_sessions:detail' session.pk %}{% else %}{% url 'test_sessions:list' %}{% endif %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x-lg me-1"></i>Cancel
+      </a>
+    </div>
+
+    <!-- ── Wizard Progress Stepper ──────────────────────────────────────── -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body p-3">
+        <div class="d-flex justify-content-between align-items-center position-relative">
+          <div class="wizard-step active" id="step-nav-1" onclick="goToStep(1)">
+            <span class="step-num">1</span>
+            <span class="step-label d-none d-md-inline">Instrument</span>
+          </div>
+          <div class="wizard-line"></div>
+          <div class="wizard-step" id="step-nav-2" onclick="goToStep(2)">
+            <span class="step-num">2</span>
+            <span class="step-label d-none d-md-inline">Test Info</span>
+          </div>
+          <div class="wizard-line"></div>
+          <div class="wizard-step" id="step-nav-3" onclick="goToStep(3)">
+            <span class="step-num">3</span>
+            <span class="step-label d-none d-md-inline">Environment</span>
+          </div>
+          <div class="wizard-line"></div>
+          <div class="wizard-step" id="step-nav-4" onclick="goToStep(4)">
+            <span class="step-num">4</span>
+            <span class="step-label d-none d-md-inline">Procedures</span>
+          </div>
+          <div class="wizard-line"></div>
+          <div class="wizard-step" id="step-nav-5" onclick="goToStep(5)">
+            <span class="step-num">5</span>
+            <span class="step-label d-none d-md-inline">Observations</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Summary if any -->
+    {% if form.errors %}
+    <div class="alert alert-danger shadow-sm mb-4">
+      <h6 class="fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill me-2"></i>Please correct the following errors:</h6>
+      <ul class="mb-0 small ps-3">
+        {% for field, errors in form.errors.items %}
+          {% for err in errors %}
+          <li><strong>{{ field|title }}:</strong> {{ err }}</li>
+          {% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <!-- ── Wizard Form ──────────────────────────────────────────────────── -->
+    <form method="post" id="wizard-form" novalidate>
+      {% csrf_token %}
+      {{ form.action_intent }}
+
+      <!-- ── STEP 1: Instrument Selection ───────────────────────────────── -->
+      <div class="wizard-pane card shadow-sm border-0 mb-4" id="wizard-step-1">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <h5 class="mb-0 fw-bold text-dark">
+            <span class="badge bg-primary me-2">Step 1 of 5</span>Select Instrument Under Test
+          </h5>
+          <span class="text-muted small">Applicable metrological specs load automatically</span>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label for="id_instrument" class="form-label fw-bold">
+                Select Registered Instrument <span class="text-danger">*</span>
+              </label>
+              {{ form.instrument }}
+              <div class="form-text">Choose an instrument from your laboratory registry.</div>
+            </div>
+          </div>
+
+          <!-- Dynamic Live Spec Preview Card -->
+          <div class="card mt-4 bg-light border-0" id="instrument-preview-card" style="display: none;">
+            <div class="card-body p-3">
+              <h6 class="fw-bold text-primary mb-3">
+                <i class="bi bi-cpu me-2"></i>Instrument Metrological Specification
+              </h6>
+              <div class="row g-3 small">
+                <div class="col-sm-6 col-md-3">
+                  <span class="text-muted d-block">Instrument / Model</span>
+                  <strong class="text-dark" id="preview-name">—</strong>
+                  <span class="d-block text-muted" id="preview-model">—</span>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                  <span class="text-muted d-block">Serial Number &amp; Owner</span>
+                  <code class="fw-bold text-primary" id="preview-sn">—</code>
+                  <span class="d-block text-muted" id="preview-client">—</span>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                  <span class="text-muted d-block">Accuracy Class &amp; Ref</span>
+                  <span class="badge bg-primary" id="preview-class">—</span>
+                  <span class="d-block text-muted font-monospace" id="preview-ref">—</span>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                  <span class="text-muted d-block">Capacities &amp; Intervals</span>
+                  <span class="font-monospace text-dark d-block">
+                    Max: <strong id="preview-max">—</strong> | Min: <strong id="preview-min">—</strong>
+                  </span>
+                  <span class="font-monospace text-muted d-block">
+                    e = <span id="preview-e">—</span> | d = <span id="preview-d">—</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-end mt-4">
+            <button type="button" class="btn btn-primary px-4" onclick="nextStep(2)">
+              Proceed to Test Info <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STEP 2: Test Information ───────────────────────────────────── -->
+      <div class="wizard-pane card shadow-sm border-0 mb-4" id="wizard-step-2" style="display: none;">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <h5 class="mb-0 fw-bold text-dark">
+            <span class="badge bg-primary me-2">Step 2 of 5</span>Test Information &amp; Identification
+          </h5>
+          <span class="text-muted small">Unique tracking and standard designation</span>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="id_session_number" class="form-label fw-bold">
+                Unique Test ID / Session # <span class="text-danger">*</span>
+              </label>
+              {{ form.session_number }}
+              <div class="form-text">System-generated unique identifier for audit compliance.</div>
+            </div>
+            <div class="col-md-6">
+              <label for="id_lab_reference_number" class="form-label fw-bold">
+                Laboratory Reference Number
+              </label>
+              {{ form.lab_reference_number }}
+              <div class="form-text">Internal tracking or calibration job code.</div>
+            </div>
+            <div class="col-md-4">
+              <label for="id_test_date" class="form-label fw-bold">
+                Test Date <span class="text-danger">*</span>
+              </label>
+              {{ form.test_date }}
+            </div>
+            <div class="col-md-4">
+              <label for="id_test_location" class="form-label fw-bold">
+                Test Location / Bay
+              </label>
+              {{ form.test_location }}
+            </div>
+            <div class="col-md-4">
+              <label for="id_technician" class="form-label fw-bold">
+                Operator Name <span class="text-danger">*</span>
+              </label>
+              {{ form.technician }}
+            </div>
+            <div class="col-md-12">
+              <label for="id_oiml_edition" class="form-label fw-bold">
+                Applicable OIML R 76 Edition <span class="text-danger">*</span>
+              </label>
+              {{ form.oiml_edition }}
+              <div class="form-text">
+                Select the normative recommendation edition governing MPE limits and test protocols.
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between mt-4">
+            <button type="button" class="btn btn-outline-secondary" onclick="prevStep(1)">
+              <i class="bi bi-arrow-left me-1"></i>Back to Instrument
+            </button>
+            <button type="button" class="btn btn-primary px-4" onclick="nextStep(3)">
+              Proceed to Environment <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STEP 3: Environmental Conditions ───────────────────────────── -->
+      <div class="wizard-pane card shadow-sm border-0 mb-4" id="wizard-step-3" style="display: none;">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <h5 class="mb-0 fw-bold text-dark">
+            <span class="badge bg-primary me-2">Step 3 of 5</span>Environmental Conditions &amp; Standards
+          </h5>
+          <span class="text-muted small">OIML R 76 §5.3.1 ambient stability criteria</span>
+        </div>
+        <div class="card-body p-4">
+          <div class="alert alert-info py-2 px-3 small d-flex align-items-center mb-4">
+            <i class="bi bi-thermometer-half fs-4 me-2"></i>
+            <div>
+              <strong>Ambient Conditions Advisory:</strong>
+              OIML R 76 requires temperature stability (typically within 5°C/h without exceeding specified limits). Record conditions at test start and conclusion.
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Temperature at Start (°C)</label>
+              {{ form.temperature_start }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Temperature at End (°C)</label>
+              {{ form.temperature_end }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Relative Humidity at Start (%RH)</label>
+              {{ form.humidity_start }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Relative Humidity at End (%RH)</label>
+              {{ form.humidity_end }}
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold">Reference Standards Used</label>
+              {{ form.reference_standards }}
+              <div class="form-text">
+                Specify working standard weights (e.g. Class E2/F1 weights serial numbers and calibration certificates).
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between mt-4">
+            <button type="button" class="btn btn-outline-secondary" onclick="prevStep(2)">
+              <i class="bi bi-arrow-left me-1"></i>Back to Test Info
+            </button>
+            <button type="button" class="btn btn-primary px-4" onclick="nextStep(4)">
+              Proceed to Procedure Selection <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STEP 4: Test Procedure Selection ───────────────────────────── -->
+      <div class="wizard-pane card shadow-sm border-0 mb-4" id="wizard-step-4" style="display: none;">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <h5 class="mb-0 fw-bold text-dark">
+            <span class="badge bg-primary me-2">Step 4 of 5</span>Applicable Test Procedure Selection
+          </h5>
+          <span class="text-muted small">Configure only tests applicable to this instrument</span>
+        </div>
+        <div class="card-body p-4">
+          <p class="text-muted small mb-3">
+            <i class="bi bi-info-circle me-1"></i>
+            Select the test procedures required by your testing mandate and instrument classification. Inapplicable procedures can be deselected.
+          </p>
+
+          <div class="row g-3">
+            <!-- 1. Initial Examination -->
+            <div class="col-md-6">
+              <div class="p-3 border rounded h-100 bg-light bg-opacity-50">
+                <div class="form-check form-switch mb-2">
+                  {{ form.proc_initial_examination }}
+                  <label class="form-check-label fw-bold text-dark" for="id_proc_initial_examination">
+                    Initial Examination
+                  </label>
+                </div>
+                <small class="text-muted d-block">
+                  <span class="badge bg-secondary me-1">R 76 §A.3</span>
+                  Visual markings, rating plate, levelling bubble, and functional checks.
+                </small>
+              </div>
+            </div>
+
+            <!-- 2. Zero-setting & Tracking -->
+            <div class="col-md-6">
+              <div class="p-3 border rounded h-100 bg-light bg-opacity-50">
+                <div class="form-check form-switch mb-2">
+                  {{ form.proc_zero_setting }}
+                  <label class="form-check-label fw-bold text-dark" for="id_proc_zero_setting">
+                    Zero-Setting &amp; Zero-Tracking Tests
+                  </label>
+                </div>
+                <small class="text-muted d-block">
+                  <span class="badge bg-secondary me-1">R 76 §A.4.1–§A.4.3</span>
+                  Zero-setting accuracy (±0.25e), zero-tracking device, and tare zeroing.
+                </small>
+              </div>
+            </div>
+
+            <!-- 3. Weighing Performance -->
+            <div class="col-md-6">
+              <div class="p-3 border rounded h-100 bg-light bg-opacity-50">
+                <div class="form-check form-switch mb-2">
+                  {{ form.proc_weighing }}
+                  <label class="form-check-label fw-bold text-dark" for="id_proc_weighing">
+                    Weighing Performance Tests
+                  </label>
+                </div>
+                <small class="text-muted d-block">
+                  <span class="badge bg-primary me-1">R 76 §A.4.4</span>
+                  Increasing and decreasing nominal load test points up to Maximum capacity.
+                </small>
+              </div>
+            </div>
+
+            <!-- 4. Repeatability -->
+            <div class="col-md-6">
+              <div class="p-3 border rounded h-100 bg-light bg-opacity-50">
+                <div class="form-check form-switch mb-2">
+                  {{ form.proc_repeatability }}
+                  <label class="form-check-label fw-bold text-dark" for="id_proc_repeatability">
+                    Repeatability Test
+                  </label>
+                </div>
+                <small class="text-muted d-block">
+                  <span class="badge bg-primary me-1">R 76 §A.4.10</span>
+                  Successive test series (minimum 3 repetitions) at identical nominal loads.
+                </small>
+              </div>
+            </div>
+
+            <!-- 5. Eccentricity -->
+            <div class="col-md-6">
+              <div class="p-3 border rounded h-100 bg-light bg-opacity-50">
+                <div class="form-check form-switch mb-2">
+                  {{ form.proc_eccentricity }}
+                  <label class="form-check-label fw-bold text-dark" for="id_proc_eccentricity">
+                    Eccentricity Test
+                  </label>
+                </div>
+                <small class="text-muted d-block">
+                  <span class="badge bg-primary me-1">R 76 §A.4.7</span>
+                  Off-center load receptor placement (Centre, Front, Back, Left, Right).
+                </small>
+              </div>
+            </div>
+
+            <!-- 6. Discrimination -->
+            <div class="col-md-6">
+              <div class="p-3 border rounded h-100 bg-light bg-opacity-50">
+                <div class="form-check form-switch mb-2">
+                  {{ form.proc_discrimination }}
+                  <label class="form-check-label fw-bold text-dark" for="id_proc_discrimination">
+                    Discrimination Test
+                  </label>
+                </div>
+                <small class="text-muted d-block">
+                  <span class="badge bg-primary me-1">R 76 §A.4.8</span>
+                  Indicator sensitivity response upon adding extra small mass (~1.4d).
+                </small>
+              </div>
+            </div>
+
+            <!-- 7. Tare Weighing -->
+            <div class="col-md-6">
+              <div class="p-3 border rounded h-100">
+                <div class="form-check form-switch mb-2">
+                  {{ form.proc_tare }}
+                  <label class="form-check-label fw-bold text-dark" for="id_proc_tare">
+                    Tare Weighing Test
+                  </label>
+                </div>
+                <small class="text-muted d-block">
+                  <span class="badge bg-secondary me-1">R 76 §A.4.6</span>
+                  Weighing performance with subtractive or additive tare activated.
+                </small>
+              </div>
+            </div>
+
+            <!-- 8. Influence Quantities -->
+            <div class="col-md-6">
+              <div class="p-3 border rounded h-100">
+                <div class="form-check form-switch mb-2">
+                  {{ form.proc_influence_quantities }}
+                  <label class="form-check-label fw-bold text-dark" for="id_proc_influence_quantities">
+                    Influence Quantities &amp; Temp Test
+                  </label>
+                </div>
+                <small class="text-muted d-block">
+                  <span class="badge bg-secondary me-1">R 76 §A.5.3</span>
+                  Static temperature variation and span stability tests.
+                </small>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between mt-4">
+            <button type="button" class="btn btn-outline-secondary" onclick="prevStep(3)">
+              <i class="bi bi-arrow-left me-1"></i>Back to Environment
+            </button>
+            <button type="button" class="btn btn-primary px-4" onclick="nextStep(5)">
+              Proceed to Observations <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STEP 5: Test Observations & Review ─────────────────────────── -->
+      <div class="wizard-pane card shadow-sm border-0 mb-4" id="wizard-step-5" style="display: none;">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <h5 class="mb-0 fw-bold text-dark">
+            <span class="badge bg-primary me-2">Step 5 of 5</span>Test Observations &amp; Submission
+          </h5>
+          <span class="text-muted small">Record initial checks, remarks, and save</span>
+        </div>
+        <div class="card-body p-4">
+
+          <!-- Initial Examination Checklist Box -->
+          <div class="p-3 border rounded mb-3 bg-light bg-opacity-25">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="fw-bold mb-0 text-dark">
+                <i class="bi bi-check2-circle text-primary me-1"></i>Initial Examination Checklist
+              </h6>
+              <div class="form-check form-switch">
+                {{ form.initial_examination_passed }}
+                <label class="form-check-label fw-bold" for="id_initial_examination_passed">Examination Satisfactory</label>
+              </div>
+            </div>
+            {{ form.initial_examination_notes }}
+          </div>
+
+          <!-- Zero Setting Checklist Box -->
+          <div class="p-3 border rounded mb-3 bg-light bg-opacity-25">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="fw-bold mb-0 text-dark">
+                <i class="bi bi-record-circle text-info me-1"></i>Zero-Setting &amp; Zero-Tracking Check
+              </h6>
+              <div class="form-check form-switch">
+                {{ form.zero_test_passed }}
+                <label class="form-check-label fw-bold" for="id_zero_test_passed">Zero Within &plusmn;0.25e</label>
+              </div>
+            </div>
+            {{ form.zero_test_notes }}
+          </div>
+
+          <!-- Remarks / Observations -->
+          <div class="mb-4">
+            <label class="form-label fw-bold text-dark">
+              General Remarks &amp; Observations
+            </label>
+            {{ form.remarks }}
+            <div class="form-text">Note any special conditions, accessories, draft shield behavior, or non-linearities.</div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3 pt-3 border-top">
+            <button type="button" class="btn btn-outline-secondary" onclick="prevStep(4)">
+              <i class="bi bi-arrow-left me-1"></i>Back to Procedures
+            </button>
+
+            <div class="d-flex gap-2 w-100 w-md-auto justify-content-end">
+              <!-- Save as Draft Button -->
+              <button type="button" class="btn btn-outline-primary px-3" onclick="submitWizard('draft')">
+                <i class="bi bi-save me-1"></i>Save as Incomplete Draft
+              </button>
+
+              <!-- Save & Proceed Button -->
+              <button type="button" class="btn btn-primary px-4 shadow-sm" onclick="submitWizard('in_progress')">
+                <i class="bi bi-check-lg me-1"></i>Save &amp; Open Test Observations
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </form>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Instrument metadata dictionary passed from Django view
+const instrumentsData = {{ instruments_json|default:"{}"|safe }};
+
+function updateInstrumentPreview() {
+  const select = document.getElementById("id_instrument");
+  const previewCard = document.getElementById("instrument-preview-card");
+  if (!select || !previewCard) return;
+
+  const val = select.value;
+  if (val && instrumentsData[val]) {
+    const data = instrumentsData[val];
+    document.getElementById("preview-name").textContent = data.name;
+    document.getElementById("preview-model").textContent = data.manufacturer + " " + data.model;
+    document.getElementById("preview-sn").textContent = data.serial_number;
+    document.getElementById("preview-client").textContent = data.customer_name;
+    document.getElementById("preview-class").textContent = data.accuracy_class;
+    document.getElementById("preview-ref").textContent = data.lab_reference_number;
+    document.getElementById("preview-max").textContent = data.max_capacity + " " + data.unit;
+    document.getElementById("preview-min").textContent = data.min_capacity + " " + data.unit;
+    document.getElementById("preview-e").textContent = data.actual_scale_interval + " " + data.unit;
+    document.getElementById("preview-d").textContent = data.scale_interval + " " + data.unit;
+    previewCard.style.display = "block";
+  } else {
+    previewCard.style.display = "none";
+  }
+}
+
+// Wizard Stepper Logic
+let currentStep = 1;
+
+function goToStep(stepNumber) {
+  // Validate before advancing forward
+  if (stepNumber > currentStep) {
+    if (!validateCurrentStep(currentStep)) return;
+  }
+
+  // Hide all panes
+  for (let i = 1; i <= 5; i++) {
+    const pane = document.getElementById("wizard-step-" + i);
+    const nav = document.getElementById("step-nav-" + i);
+    if (pane) pane.style.display = "none";
+    if (nav) {
+      nav.classList.remove("active");
+      if (i < stepNumber) {
+        nav.classList.add("completed");
+      } else {
+        nav.classList.remove("completed");
+      }
+    }
+  }
+
+  // Show active pane
+  const activePane = document.getElementById("wizard-step-" + stepNumber);
+  const activeNav = document.getElementById("step-nav-" + stepNumber);
+  if (activePane) activePane.style.display = "block";
+  if (activeNav) activeNav.classList.add("active");
+
+  currentStep = stepNumber;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function nextStep(stepNumber) {
+  goToStep(stepNumber);
+}
+
+function prevStep(stepNumber) {
+  goToStep(stepNumber);
+}
+
+function validateCurrentStep(step) {
+  if (step === 1) {
+    const instSelect = document.getElementById("id_instrument");
+    if (instSelect && !instSelect.value) {
+      alert("Please select an instrument under test before proceeding.");
+      instSelect.focus();
+      return false;
+    }
+  } else if (step === 2) {
+    const sessionNum = document.getElementById("id_session_number");
+    if (sessionNum && !sessionNum.value.trim()) {
+      alert("Unique Test ID is required.");
+      sessionNum.focus();
+      return false;
+    }
+  }
+  return true;
+}
+
+function submitWizard(actionIntent) {
+  const intentInput = document.getElementById("id_action_intent");
+  if (intentInput) {
+    intentInput.value = actionIntent;
+  }
+  const form = document.getElementById("wizard-form");
+  form.submit();
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  const select = document.getElementById("id_instrument");
+  if (select) {
+    select.addEventListener("change", updateInstrumentPreview);
+    updateInstrumentPreview();
+  }
+});
+</script>
+
+<style>
+/* Stepper Styles */
+.wizard-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  z-index: 2;
+}
+.wizard-step .step-num {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background-color: #e2e8f0;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+.wizard-step.active .step-num {
+  background-color: #0d6efd;
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.2);
+}
+.wizard-step.completed .step-num {
+  background-color: #198754;
+  color: #fff;
+}
+.wizard-step .step-label {
+  font-size: 0.8rem;
+  margin-top: 6px;
+  font-weight: 600;
+  color: #64748b;
+}
+.wizard-step.active .step-label {
+  color: #0d6efd;
+}
+.wizard-line {
+  flex-grow: 1;
+  height: 2px;
+  background-color: #e2e8f0;
+  margin: 0 10px;
+  position: relative;
+  top: -10px;
+}
+</style>
+{% endblock %}

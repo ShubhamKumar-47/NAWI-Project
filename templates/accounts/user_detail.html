@@ -1,0 +1,129 @@
+{% extends "base/_base.html" %}
+{% block title %}{{ target_user.full_name }} — Personnel Record{% endblock %}
+
+{% block breadcrumb %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"Administration"},{"label":"User Directory","url":"/accounts/users/"},{"label":"User Dossier"}]'|safe %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom">
+  <div>
+    <h3 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2">
+      <i class="bi bi-person-badge-fill text-primary"></i>
+      <span>{{ target_user.full_name }}</span>
+      {% if target_user.is_active %}
+      <span class="badge badge-soft-success fs-6"><i class="bi bi-check-circle-fill me-1"></i>Active</span>
+      {% else %}
+      <span class="badge badge-soft-danger fs-6"><i class="bi bi-x-circle-fill me-1"></i>Inactive</span>
+      {% endif %}
+    </h3>
+    <p class="text-muted small mb-0 mt-1">
+      Personnel profile, metrological authorization scope, and ISO 17025 signatory privileges.
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back to User Directory
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left Column: User Profile Card -->
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm text-center p-4 bg-white mb-4">
+      <div class="avatar-circle avatar-lg {% if target_user.role == 'ADMINISTRATOR' %}bg-danger text-white{% elif target_user.role == 'REVIEWER' %}bg-success text-white{% elif target_user.role == 'LAB_MANAGER' %}bg-primary text-white{% else %}bg-warning text-dark{% endif %} mx-auto mb-3 shadow">
+        {{ target_user.first_name|first|upper }}{{ target_user.last_name|first|upper }}
+      </div>
+      <h5 class="fw-bold text-dark mb-1">{{ target_user.full_name }}</h5>
+      <div class="text-muted small mb-2">{{ target_user.job_title|default:"Laboratory Professional" }}</div>
+      <div>
+        <span class="badge bg-primary text-uppercase px-3 py-1">{{ target_user.get_role_display }}</span>
+      </div>
+
+      <hr class="my-3">
+
+      <div class="text-start small">
+        <div class="mb-2">
+          <span class="text-muted d-block" style="font-size: 7.5pt;">Email Address</span>
+          <a href="mailto:{{ target_user.email }}" class="text-decoration-none font-monospace">{{ target_user.email }}</a>
+        </div>
+        <div class="mb-2">
+          <span class="text-muted d-block" style="font-size: 7.5pt;">Telephone / Extension</span>
+          <span class="text-dark">{{ target_user.phone|default:"Not specified" }}</span>
+        </div>
+        <div>
+          <span class="text-muted d-block" style="font-size: 7.5pt;">Affiliated Organisation</span>
+          <span class="text-dark fw-semibold">{{ target_user.organization.name|default:"Metrology Testing Center" }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Role Privileges & Technical Scope -->
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm mb-4 bg-white">
+      <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-shield-lock text-primary me-2"></i>Metrological Authorization &amp; System Permissions
+        </h6>
+      </div>
+      <div class="card-body p-4">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="p-3 border rounded bg-light">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-bold text-dark small">Approve &amp; Certify Records</span>
+                {% if target_user.can_approve_sessions %}
+                <span class="badge bg-success"><i class="bi bi-check-lg"></i> Granted</span>
+                {% else %}
+                <span class="badge bg-secondary"><i class="bi bi-x-lg"></i> Disabled</span>
+                {% endif %}
+              </div>
+              <small class="text-muted">Authorized to perform formal OIML R 76 compliance review, sign certificates, and reject non-compliant tests.</small>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="p-3 border rounded bg-light">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-bold text-dark small">Generate Official Reports</span>
+                {% if target_user.can_generate_reports %}
+                <span class="badge bg-success"><i class="bi bi-check-lg"></i> Granted</span>
+                {% else %}
+                <span class="badge bg-secondary"><i class="bi bi-x-lg"></i> Disabled</span>
+                {% endif %}
+              </div>
+              <small class="text-muted">Authorized to issue immutable ReportLab PDF certificates and editable Word (.docx) test reports.</small>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="p-3 border rounded bg-light">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-bold text-dark small">User Governance</span>
+                {% if target_user.can_manage_users %}
+                <span class="badge bg-success"><i class="bi bi-check-lg"></i> Granted</span>
+                {% else %}
+                <span class="badge bg-secondary"><i class="bi bi-x-lg"></i> Disabled</span>
+                {% endif %}
+              </div>
+              <small class="text-muted">Authorized to create laboratory personnel, assign roles, and administer organization rosters.</small>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="p-3 border rounded bg-light">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-bold text-dark small">Observation Recording</span>
+                <span class="badge bg-success"><i class="bi bi-check-lg"></i> Granted</span>
+              </div>
+              <small class="text-muted">Authorized to perform initial examinations and enter weighing observations for test procedures.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base/_base.html" %}
+{% block title %}Add Eccentricity Position — {{ session.session_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0" style="max-width: 800px;">
+  <div class="mb-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1 small">
+        <li class="breadcrumb-item"><a href="{% url 'test_sessions:list' %}">Test Sessions</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'test_sessions:detail' session.pk %}">{{ session.session_number }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'measurements:eccentricity_list' session.pk %}">Eccentricity Test</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Add Position</li>
+      </ol>
+    </nav>
+    <h4 class="mb-0 fw-bold text-dark">
+      <i class="bi bi-plus-circle text-primary me-2"></i>Record Single Eccentricity Position
+    </h4>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-white py-3 border-bottom">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <span class="text-muted small d-block">Instrument</span>
+          <strong>{{ instrument.display_name }} (Class {{ instrument.get_accuracy_class_display }})</strong>
+        </div>
+        <span class="badge bg-light text-dark font-monospace">e = {{ instrument.actual_scale_interval }} {{ instrument.unit_of_measure }}</span>
+      </div>
+    </div>
+    <form method="post" class="card-body p-4">
+      {% csrf_token %}
+      {% if form.errors %}
+      <div class="alert alert-danger mb-3">
+        <strong>Please correct the following errors:</strong>
+        <ul class="mb-0 mt-1 small">
+          {% for field, errors in form.errors.items %}
+            {% for error in errors %}
+              <li>{{ field|title }}: {{ error }}</li>
+            {% endfor %}
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold small">Load Position *</label>
+        {{ form.load_position }}
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Reference Load ({{ instrument.unit_of_measure }}) *</label>
+          {{ form.nominal_load }}
+          <div class="form-text">Typically approx. 1/3 Max per OIML R 76 Table 8.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Displayed Indication ({{ instrument.unit_of_measure }}) *</label>
+          {{ form.indication }}
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Zero Indication Before Load</label>
+          {{ form.zero_indication }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Ambient Temperature (°C)</label>
+          {{ form.temperature }}
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold small">Observations / Remarks</label>
+        {{ form.observations }}
+      </div>
+
+      <div class="form-check form-switch mb-4">
+        {{ form.is_draft }}
+        <label class="form-check-label small" for="{{ form.is_draft.id_for_label }}">
+          Save as preliminary draft (unvalidated observation)
+        </label>
+      </div>
+
+      <div class="d-flex justify-content-between pt-3 border-top">
+        <a href="{% url 'measurements:eccentricity_list' session.pk %}" class="btn btn-outline-secondary">
+          <i class="bi bi-x me-1"></i>Cancel
+        </a>
+        <button type="submit" class="btn btn-primary px-4">
+          <i class="bi bi-check-circle me-1"></i>Save Position Observation
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

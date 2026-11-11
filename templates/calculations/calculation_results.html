@@ -1,0 +1,239 @@
+{% extends "base/_base.html" %}
+{% block title %}Calculation Engine Results — {{ session.session_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+  <!-- Top Navigation & Action Header -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1 small">
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:list' %}">Test Sessions</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:detail' session.pk %}">{{ session.session_number }}</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Calculation Engine Results</li>
+        </ol>
+      </nav>
+      <h4 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-calculator-fill text-primary me-2"></i>Automated Metrological Calculation Results
+        <span class="badge bg-secondary ms-2 fs-6">OIML R 76 Engine</span>
+      </h4>
+    </div>
+    <div class="d-flex gap-2 align-items-center mt-2 mt-sm-0">
+      <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to Session
+      </a>
+      {% if can_recalculate %}
+      <form method="post" action="{% url 'calculations:session_recalculate' session.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-sm shadow-sm" title="Re-run calculation engine on all observations">
+          <i class="bi bi-arrow-clockwise me-1"></i>Recalculate All Procedures
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Instrument Metrological Banner -->
+  <div class="card border-0 shadow-sm mb-4 bg-light">
+    <div class="card-body py-2 px-3">
+      <div class="row g-2 align-items-center small">
+        <div class="col-md-3">
+          <span class="text-muted d-block">Instrument</span>
+          <strong class="text-dark">{{ instrument.display_name }} ({{ instrument.model_number }})</strong>
+        </div>
+        <div class="col-md-2">
+          <span class="text-muted d-block">Accuracy Class</span>
+          <span class="badge bg-primary text-uppercase">{{ instrument.get_accuracy_class_display }}</span>
+        </div>
+        <div class="col-md-3">
+          <span class="text-muted d-block">Capacity &amp; Verification Interval</span>
+          <span class="font-monospace fw-semibold">Max: {{ instrument.max_capacity }} {{ instrument.unit_of_measure }} | e = {{ instrument.actual_scale_interval }} {{ instrument.unit_of_measure }}</span>
+        </div>
+        <div class="col-md-2">
+          <span class="text-muted d-block">Standard Edition</span>
+          <span class="badge bg-dark font-monospace">{{ session.oiml_edition|default:"OIML R 76-1:2006" }}</span>
+        </div>
+        <div class="col-md-2 text-md-end">
+          <span class="text-muted d-block">Session Status</span>
+          {% include "components/_status_badge.html" with status=session.status %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calculation KPI Summary Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3 col-sm-6">
+      <div class="card border-0 shadow-sm p-3 border-start border-4 border-primary bg-white">
+        <div class="text-muted small fw-semibold text-uppercase">Evaluated Points</div>
+        <div class="d-flex align-items-baseline gap-2">
+          <span class="fs-3 fw-bold text-dark">{{ total_count }}</span>
+          <span class="text-muted small">observations</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="card border-0 shadow-sm p-3 border-start border-4 border-success bg-white">
+        <div class="text-muted small fw-semibold text-uppercase">Compliant Points</div>
+        <div class="d-flex align-items-baseline gap-2">
+          <span class="fs-3 fw-bold text-success">{{ pass_count }}</span>
+          <span class="text-success small fw-semibold">PASS</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="card border-0 shadow-sm p-3 border-start border-4 border-danger bg-white">
+        <div class="text-muted small fw-semibold text-uppercase">Tolerance Exceeded</div>
+        <div class="d-flex align-items-baseline gap-2">
+          <span class="fs-3 fw-bold text-danger">{{ fail_count }}</span>
+          <span class="text-danger small fw-semibold">FAIL</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="card border-0 shadow-sm p-3 border-start border-4 {% if session.overall_result == 'PASS' %}border-success{% elif session.overall_result == 'FAIL' %}border-danger{% else %}border-warning{% endif %} bg-white">
+        <div class="text-muted small fw-semibold text-uppercase">Overall Session Result</div>
+        <div class="d-flex align-items-baseline gap-2">
+          {% if session.overall_result == 'PASS' %}
+          <span class="fs-4 fw-bold text-success"><i class="bi bi-check-circle-fill me-1"></i>PASS</span>
+          {% elif session.overall_result == 'FAIL' %}
+          <span class="fs-4 fw-bold text-danger"><i class="bi bi-x-circle-fill me-1"></i>FAIL</span>
+          {% else %}
+          <span class="fs-4 fw-bold text-warning"><i class="bi bi-clock-history me-1"></i>PENDING</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detailed Results Grouped by Test Procedure -->
+  {% if grouped_records %}
+    {% for proc_title, rec_list in grouped_records.items %}
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <div>
+          <h6 class="mb-0 fw-bold text-dark">
+            <i class="bi bi-clipboard-data text-primary me-2"></i>{{ proc_title }}
+          </h6>
+          <small class="text-muted">Clause Reference: <span class="font-monospace text-primary">{{ rec_list.first.standard_clause }}</span> | Rule Set: <span class="badge bg-light text-secondary border">{{ rec_list.first.rule_version }}</span></small>
+        </div>
+        <span class="badge bg-primary rounded-pill">{{ rec_list.count }} Record{{ rec_list.count|pluralize }}</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle table-hover mb-0">
+            <thead class="table-light">
+              <tr class="small text-uppercase text-secondary">
+                <th style="width: 50px;">#</th>
+                <th style="width: 220px;">Observation Title</th>
+                <th style="width: 140px;">Reference Load</th>
+                <th style="width: 140px;">Indicated Reading</th>
+                <th style="width: 130px;">Calculated Error</th>
+                <th style="width: 140px;">Applicable MPE</th>
+                <th style="width: 130px;">Comparison</th>
+                <th style="width: 120px;">Result</th>
+                <th class="text-end pe-3" style="width: 120px;">Formula &amp; Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rec_list %}
+              <tr class="{% if r.comparison_result == 'PASS' %}table-success bg-opacity-25{% elif r.comparison_result == 'FAIL' %}table-danger bg-opacity-25{% endif %}">
+                <td class="text-muted small">{{ r.sequence_number }}</td>
+                <td>
+                  <strong class="text-dark small d-block">{{ r.title }}</strong>
+                  <span class="font-monospace text-muted" style="font-size: 11px;">Ref #{{ r.measurement_reference_id|default:"N/A" }}</span>
+                </td>
+                <td class="font-monospace fw-semibold">
+                  {% if r.reference_load is not None %}{{ r.reference_load }} {{ instrument.unit_of_measure }}{% else %}—{% endif %}
+                </td>
+                <td class="font-monospace text-primary fw-semibold">
+                  {% if r.indicated_reading is not None %}{{ r.indicated_reading }} {{ instrument.unit_of_measure }}{% else %}—{% endif %}
+                </td>
+                <td class="font-monospace fw-bold {% if r.comparison_result == 'FAIL' %}text-danger{% else %}text-dark{% endif %}">
+                  {% if r.calculated_error is not None %}{{ r.calculated_error }}{% else %}—{% endif %}
+                </td>
+                <td class="font-monospace text-muted small">
+                  {% if r.permissible_error_mpe is not None %}&plusmn;{{ r.permissible_error_mpe }}{% else %}—{% endif %}
+                </td>
+                <td class="small">
+                  {% if r.comparison_result == 'PASS' %}
+                  <span class="text-success fw-semibold"><i class="bi bi-check me-1"></i>Within MPE</span>
+                  {% elif r.comparison_result == 'FAIL' %}
+                  <span class="text-danger fw-semibold"><i class="bi bi-x me-1"></i>Exceeds MPE</span>
+                  {% else %}
+                  <span class="text-muted"><i class="bi bi-dash me-1"></i>Unconfigured</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if r.comparison_result == 'PASS' %}
+                  <span class="badge bg-success px-2 py-1"><i class="bi bi-check-lg me-1"></i>PASS</span>
+                  {% elif r.comparison_result == 'FAIL' %}
+                  <span class="badge bg-danger px-2 py-1"><i class="bi bi-x-lg me-1"></i>FAIL</span>
+                  {% else %}
+                  <span class="badge bg-secondary px-2 py-1"><i class="bi bi-question me-1"></i>NOT EVALUATED</span>
+                  {% endif %}
+                </td>
+                <td class="text-end pe-3">
+                  <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2"
+                          data-bs-toggle="collapse" data-bs-target="#explain-{{ r.id }}"
+                          aria-expanded="false" aria-controls="explain-{{ r.id }}"
+                          title="View mathematical calculation breakdown">
+                    <i class="bi bi-info-circle me-1"></i>Explain
+                  </button>
+                </td>
+              </tr>
+              <!-- Expandable Calculation Breakdown Row -->
+              <tr class="collapse bg-light" id="explain-{{ r.id }}">
+                <td colspan="9" class="p-3">
+                  <div class="card border shadow-sm">
+                    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                      <strong class="small text-dark">
+                        <i class="bi bi-journal-text text-primary me-2"></i>Explanation of the Calculation — {{ r.title }}
+                      </strong>
+                      <span class="badge bg-light text-dark font-monospace">{{ r.standard_clause }}</span>
+                    </div>
+                    <div class="card-body p-3 small">
+                      <p class="mb-2 font-monospace text-dark bg-light p-2 rounded border">
+                        {{ r.explanation }}
+                      </p>
+                      <div class="row g-2 text-muted" style="font-size: 11px;">
+                        <div class="col-md-4">
+                          <strong>Standard Edition:</strong> {{ r.standard_edition }}
+                        </div>
+                        <div class="col-md-4">
+                          <strong>Rule Version:</strong> {{ r.rule_version }}
+                        </div>
+                        <div class="col-md-4">
+                          <strong>Calculated Timestamp:</strong> {{ r.calculated_at|date:"Y-m-d H:i:s" }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="card shadow-sm border-0 py-5 text-center text-muted">
+      <div class="card-body">
+        <i class="bi bi-cpu fs-1 d-block mb-3 text-secondary"></i>
+        <h5 class="fw-bold">No Calculation Records Found</h5>
+        <p class="small text-muted mb-3">No observations have been evaluated for this test session yet.</p>
+        {% if can_recalculate %}
+        <form method="post" action="{% url 'calculations:session_recalculate' session.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-play-circle me-1"></i>Run Automated Calculation Engine Now
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

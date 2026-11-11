@@ -1,0 +1,513 @@
+{% extends "base/_base.html" %}
+{% block title %}Laboratory Dashboard{% endblock %}
+
+{% block content %}
+<!-- Top Header & Breadcrumbs -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <h3 class="fw-bold text-dark mb-1">
+      <i class="bi bi-speedometer2 text-primary me-2"></i>Laboratory Dashboard
+    </h3>
+    <p class="text-muted small mb-0">
+      <i class="bi bi-building me-1"></i>{{ user.organization.name|default:"Metrology Testing Center" }}
+      &nbsp;·&nbsp; <i class="bi bi-calendar3 me-1"></i>{{ today|date:"l, d F Y" }}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'test_sessions:create' %}" class="btn btn-primary shadow-sm">
+      <i class="bi bi-plus-circle me-1"></i>Create New Test
+    </a>
+    <a href="{% url 'instruments:create' %}" class="btn btn-outline-primary">
+      <i class="bi bi-tools me-1"></i>Register Instrument
+    </a>
+  </div>
+</div>
+
+<!-- ── Quick Action Cards ──────────────────────────────────────── -->
+<div class="row g-2 mb-4">
+  <div class="col-6 col-md-3">
+    <a href="{% url 'instruments:create' %}" class="action-card p-3 d-flex align-items-center gap-3 text-decoration-none">
+      <div class="avatar-circle bg-primary bg-opacity-10 text-primary">
+        <i class="bi bi-plus-lg fs-5"></i>
+      </div>
+      <div>
+        <div class="fw-bold text-dark small">Register Instrument</div>
+        <div class="text-muted" style="font-size: 0.75rem;">Add new NAWI unit</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{% url 'test_sessions:create' %}" class="action-card p-3 d-flex align-items-center gap-3 text-decoration-none">
+      <div class="avatar-circle bg-success bg-opacity-10 text-success">
+        <i class="bi bi-clipboard-plus fs-5"></i>
+      </div>
+      <div>
+        <div class="fw-bold text-dark small">Create New Test</div>
+        <div class="text-muted" style="font-size: 0.75rem;">Start R 76 testing</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{% url 'instruments:list' %}" class="action-card p-3 d-flex align-items-center gap-3 text-decoration-none">
+      <div class="avatar-circle bg-info bg-opacity-10 text-info">
+        <i class="bi bi-card-checklist fs-5"></i>
+      </div>
+      <div>
+        <div class="fw-bold text-dark small">View All Instruments</div>
+        <div class="text-muted" style="font-size: 0.75rem;">Registry & calibrations</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{% url 'reports:list' %}" class="action-card p-3 d-flex align-items-center gap-3 text-decoration-none">
+      <div class="avatar-circle bg-warning bg-opacity-10 text-warning">
+        <i class="bi bi-file-earmark-pdf fs-5"></i>
+      </div>
+      <div>
+        <div class="fw-bold text-dark small">Generate Report</div>
+        <div class="text-muted" style="font-size: 0.75rem;">Issued certificates</div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<!-- ── Interactive Filters (Date & Test Status) ───────────────── -->
+<div class="filter-bar shadow-sm">
+  <form method="get" class="row g-2 align-items-center">
+    <div class="col-12 col-md-auto d-flex align-items-center">
+      <span class="text-dark fw-bold small me-2"><i class="bi bi-funnel-fill text-primary me-1"></i>Filter Records:</span>
+    </div>
+
+    <!-- Status Dropdown -->
+    <div class="col-12 col-sm-4 col-md-3">
+      <select name="status" class="form-select form-select-sm">
+        <option value="">All Test Statuses</option>
+        {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if current_status == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Date From -->
+    <div class="col-6 col-sm-4 col-md-2">
+      <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}" placeholder="From date">
+    </div>
+
+    <!-- Date To -->
+    <div class="col-6 col-sm-4 col-md-2">
+      <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}" placeholder="To date">
+    </div>
+
+    <!-- Buttons -->
+    <div class="col-12 col-md-auto d-flex gap-2">
+      <button type="submit" class="btn btn-primary btn-sm px-3">
+        <i class="bi bi-search me-1"></i>Filter
+      </button>
+      {% if is_filtered %}
+      <a href="{% url 'dashboard:home' %}" class="btn btn-outline-danger btn-sm" title="Clear Filters">
+        <i class="bi bi-x-circle me-1"></i>Reset
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Quick Date Presets -->
+    <div class="col-12 d-flex gap-1 mt-2 flex-wrap align-items-center">
+      <span class="text-muted small me-2">Presets:</span>
+      <a href="?preset=today" class="btn btn-sm py-0 px-2 {% if preset == 'today' %}btn-dark{% else %}btn-outline-secondary{% endif %}">Today</a>
+      <a href="?preset=week" class="btn btn-sm py-0 px-2 {% if preset == 'week' %}btn-dark{% else %}btn-outline-secondary{% endif %}">Last 7 Days</a>
+      <a href="?preset=month" class="btn btn-sm py-0 px-2 {% if preset == 'month' %}btn-dark{% else %}btn-outline-secondary{% endif %}">Last 30 Days</a>
+      <a href="?preset=year" class="btn btn-sm py-0 px-2 {% if preset == 'year' %}btn-dark{% else %}btn-outline-secondary{% endif %}">This Year</a>
+      <a href="{% url 'dashboard:home' %}" class="btn btn-sm py-0 px-2 {% if not preset and not is_filtered %}btn-dark{% else %}btn-outline-secondary{% endif %}">All Time</a>
+    </div>
+  </form>
+</div>
+
+<!-- ── 6 KPI Metric Cards ──────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <!-- 1. Total Registered Instruments -->
+  <div class="col-sm-6 col-xl-2 col-md-4">
+    <div class="kpi-card h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div class="kpi-label">Total Instruments</div>
+        <div class="kpi-icon bg-primary bg-opacity-10 text-primary">
+          <i class="bi bi-tools"></i>
+        </div>
+      </div>
+      <div class="kpi-value">{{ kpi.total_instruments }}</div>
+      <small class="text-muted">Registered in registry</small>
+    </div>
+  </div>
+
+  <!-- 2. Total Test Records -->
+  <div class="col-sm-6 col-xl-2 col-md-4">
+    <div class="kpi-card h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div class="kpi-label">Total Test Records</div>
+        <div class="kpi-icon bg-info bg-opacity-10 text-info">
+          <i class="bi bi-clipboard2-data"></i>
+        </div>
+      </div>
+      <div class="kpi-value">{{ kpi.total_records }}</div>
+      <small class="text-muted">Total sessions</small>
+    </div>
+  </div>
+
+  <!-- 3. Tests In Progress -->
+  <div class="col-sm-6 col-xl-2 col-md-4">
+    <div class="kpi-card h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div class="kpi-label">Tests In Progress</div>
+        <div class="kpi-icon bg-secondary bg-opacity-10 text-secondary">
+          <i class="bi bi-hourglass-split"></i>
+        </div>
+      </div>
+      <div class="kpi-value text-primary">{{ kpi.in_progress }}</div>
+      <small class="text-muted">Testing ongoing</small>
+    </div>
+  </div>
+
+  <!-- 4. Reports Pending Approval -->
+  <div class="col-sm-6 col-xl-2 col-md-4">
+    <div class="kpi-card h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div class="kpi-label">Reports Pending Approval</div>
+        <div class="kpi-icon bg-warning bg-opacity-10 text-warning">
+          <i class="bi bi-clock-history"></i>
+        </div>
+      </div>
+      <div class="kpi-value text-warning">{{ kpi.pending_review }}</div>
+      <small class="text-muted">Awaiting review</small>
+    </div>
+  </div>
+
+  <!-- 5. Approved Reports -->
+  <div class="col-sm-6 col-xl-2 col-md-4">
+    <div class="kpi-card h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div class="kpi-label">Approved Reports</div>
+        <div class="kpi-icon bg-success bg-opacity-10 text-success">
+          <i class="bi bi-check-circle-fill"></i>
+        </div>
+      </div>
+      <div class="kpi-value text-success">{{ kpi.approved }}</div>
+      <small class="text-muted">Verified & signed</small>
+    </div>
+  </div>
+
+  <!-- 6. Rejected Reports -->
+  <div class="col-sm-6 col-xl-2 col-md-4">
+    <div class="kpi-card h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div class="kpi-label">Rejected Reports</div>
+        <div class="kpi-icon bg-danger bg-opacity-10 text-danger">
+          <i class="bi bi-x-circle-fill"></i>
+        </div>
+      </div>
+      <div class="kpi-value text-danger">{{ kpi.rejected }}</div>
+      <small class="text-muted">Returned for edits</small>
+    </div>
+  </div>
+</div>
+
+<!-- ── Pending Approvals Actionable Section ────────────────────── -->
+{% if pending_approvals %}
+<div class="card shadow-sm mb-4 border-warning">
+  <div class="card-header bg-warning bg-opacity-10 d-flex justify-content-between align-items-center">
+    <div class="fw-bold text-dark">
+      <i class="bi bi-exclamation-circle-fill text-warning me-2"></i>
+      Action Required: Reports Pending Review & Approval ({{ pending_approvals|length }})
+    </div>
+    <span class="badge bg-warning text-dark">Awaiting Approver</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Session Number</th>
+            <th>Instrument Model</th>
+            <th>Serial Number</th>
+            <th>Test Date</th>
+            <th>Technician</th>
+            <th>Status</th>
+            <th class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for session in pending_approvals %}
+          <tr>
+            <td class="font-monospace fw-bold">
+              <a href="{% url 'test_sessions:detail' session.pk %}">{{ session.session_number }}</a>
+            </td>
+            <td>{{ session.instrument.manufacturer }} {{ session.instrument.model_name }}</td>
+            <td class="font-monospace small">{{ session.instrument.serial_number }}</td>
+            <td>{{ session.test_date|date:"d M Y" }}</td>
+            <td>{{ session.technician.full_name }}</td>
+            <td>{% include "components/_status_badge.html" with status=session.status %}</td>
+            <td class="text-end">
+              <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-sm btn-primary">
+                <i class="bi bi-check2-circle me-1"></i>Review & Decide
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Charts Row (Monthly Trends & Status Distribution) ───────── -->
+<div class="row g-3 mb-4">
+  <!-- Monthly Test Report Statistics -->
+  <div class="col-lg-8">
+    <div class="card shadow-sm h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold">
+          <i class="bi bi-bar-chart-line text-primary me-2"></i>Monthly Test Report Statistics (Last 6 Months)
+        </h6>
+        <span class="badge bg-light text-muted border">Completed Tests</span>
+      </div>
+      <div class="card-body">
+        <canvas id="monthlyTrendChart" height="110"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Test Status Distribution -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold">
+          <i class="bi bi-pie-chart text-info me-2"></i>Test Status Distribution
+        </h6>
+        <span class="badge bg-light text-muted border">Active Records</span>
+      </div>
+      <div class="card-body d-flex flex-column align-items-center justify-content-center">
+        <div style="width: 100%; max-width: 250px;">
+          <canvas id="statusDonutChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Data Tables Row (Recent Records & Recently Registered Instruments) -->
+<div class="row g-3">
+  <!-- Recent Test Records -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h6 class="mb-0 fw-bold">
+          <i class="bi bi-clock-history text-secondary me-2"></i>Recent Test Records
+        </h6>
+        <div class="d-flex align-items-center gap-2">
+          <input type="text" class="form-control form-control-sm py-0 px-2" style="max-width: 160px; font-size: 0.78rem;" placeholder="Filter rows..." data-table-search="#recent-sessions-table">
+          <a href="{% url 'test_sessions:list' %}" class="btn btn-sm btn-outline-primary py-0">View All</a>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0" id="recent-sessions-table">
+            <thead class="table-light">
+              <tr>
+                <th>Session #</th>
+                <th>Instrument</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Result</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for session in recent_sessions %}
+              <tr>
+                <td class="font-monospace fw-semibold">
+                  <a href="{% url 'test_sessions:detail' session.pk %}">{{ session.session_number }}</a>
+                </td>
+                <td>
+                  <span class="fw-semibold">{{ session.instrument.manufacturer }}</span>
+                  <small class="text-muted d-block font-monospace">{{ session.instrument.model_name }}</small>
+                </td>
+                <td class="small">{{ session.test_date|date:"d M Y" }}</td>
+                <td>{% include "components/_status_badge.html" with status=session.status %}</td>
+                <td>{% include "components/_pass_fail_badge.html" with result=session.overall_result %}</td>
+                <td class="text-end">
+                  <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-sm btn-outline-primary py-0 px-2">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="text-center text-muted py-4">
+                  No test records found matching the filter criteria.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recently Registered Instruments -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h6 class="mb-0 fw-bold">
+          <i class="bi bi-tools text-primary me-2"></i>Recently Registered Instruments
+        </h6>
+        <div class="d-flex align-items-center gap-2">
+          <input type="text" class="form-control form-control-sm py-0 px-2" style="max-width: 140px; font-size: 0.78rem;" placeholder="Filter..." data-table-search="#recent-instruments-table">
+          <a href="{% url 'instruments:list' %}" class="btn btn-sm btn-outline-primary py-0">View All</a>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0" id="recent-instruments-table">
+            <thead class="table-light">
+              <tr>
+                <th>Serial / Model</th>
+                <th>Class</th>
+                <th>Capacity</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for inst in recent_instruments %}
+              <tr>
+                <td>
+                  <a href="{% url 'instruments:detail' inst.pk %}" class="font-monospace fw-semibold">
+                    {{ inst.serial_number }}
+                  </a>
+                  <small class="text-muted d-block">{{ inst.manufacturer }} {{ inst.model_name }}</small>
+                </td>
+                <td><span class="badge bg-secondary">Class {{ inst.accuracy_class }}</span></td>
+                <td class="small font-monospace">{{ inst.max_capacity }} {{ inst.unit_of_measurement }}</td>
+                <td>{% include "components/_status_badge.html" with status=inst.status %}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="4" class="text-center text-muted py-4">
+                  No instruments registered yet.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  // ── Monthly Test Report Trend Chart (Bar + Gradient) ───────────────────────
+  const monthlyCanvas = document.getElementById("monthlyTrendChart");
+  if (monthlyCanvas) {
+    const monthlyLabels = JSON.parse('{{ monthly_labels_json|escapejs }}');
+    const monthlyData = JSON.parse('{{ monthly_data_json|escapejs }}');
+
+    new Chart(monthlyCanvas, {
+      type: "bar",
+      data: {
+        labels: monthlyLabels,
+        datasets: [{
+          label: "Test Records",
+          data: monthlyData,
+          backgroundColor: "#0ea5e9",
+          borderColor: "#0284c7",
+          borderWidth: 1,
+          borderRadius: 6,
+          maxBarThickness: 42,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "#0f172a",
+            padding: 10,
+            cornerRadius: 8,
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0, color: "#64748b" },
+            grid: { color: "#f1f5f9" }
+          },
+          x: {
+            ticks: { color: "#64748b" },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  }
+
+  // ── Test Status Distribution Chart (Donut) ─────────────────────────────────
+  const statusCanvas = document.getElementById("statusDonutChart");
+  if (statusCanvas) {
+    const statusLabels = JSON.parse('{{ status_labels_json|escapejs }}');
+    const statusData = JSON.parse('{{ status_data_json|escapejs }}');
+
+    // Check if there is data
+    const totalCount = statusData.reduce((a, b) => a + b, 0);
+
+    new Chart(statusCanvas, {
+      type: "doughnut",
+      data: {
+        labels: statusLabels,
+        datasets: [{
+          data: totalCount > 0 ? statusData : [1, 0, 0, 0, 0],
+          backgroundColor: totalCount > 0 ? [
+            "#64748b", // Draft (gray)
+            "#0ea5e9", // In Progress (light blue)
+            "#f59e0b", // Pending Review (amber)
+            "#10b981", // Approved (green)
+            "#ef4444"  // Rejected (red)
+          ] : ["#e2e8f0"],
+          borderWidth: 2,
+          borderColor: "#ffffff",
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: "68%",
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              boxWidth: 12,
+              padding: 12,
+              font: { size: 11 },
+              color: "#475569"
+            }
+          },
+          tooltip: {
+            enabled: totalCount > 0,
+            backgroundColor: "#0f172a",
+            cornerRadius: 8,
+            callbacks: {
+              label: function (ctx) {
+                return ` ${ctx.label}: ${ctx.raw} record(s)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

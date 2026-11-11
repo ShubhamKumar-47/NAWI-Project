@@ -1,0 +1,135 @@
+{% extends "base/_base.html" %}
+{% block title %}Generate Report — {{ session.session_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0" style="max-width: 900px;">
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1 small">
+          <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:detail' session.pk %}">{{ session.session_number }}</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Generate Report</li>
+        </ol>
+      </nav>
+      <h4 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-file-earmark-pdf-fill text-danger me-2"></i>Generate Official Test Report
+      </h4>
+      <p class="text-muted small mb-0 mt-1">
+        Compile approved metrological observations and calculations into a verified PDF certificate.
+      </p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'reports:session_preview' session.pk %}" target="_blank" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-eye me-1"></i>Live PDF Preview
+      </a>
+      <a href="{% url 'test_sessions:review' session.pk %}" class="btn btn-outline-dark btn-sm">
+        <i class="bi bi-shield-check me-1"></i>Review Console
+      </a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4 bg-white">
+    <div class="card-header bg-light py-3 border-bottom">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-info-circle text-primary me-2"></i>Report Parameters &amp; Verification Status
+      </h6>
+    </div>
+    <div class="card-body p-4">
+      <div class="row g-3 small mb-4">
+        <div class="col-md-6">
+          <div class="p-3 bg-light rounded border">
+            <span class="text-muted text-uppercase fw-semibold" style="font-size: 7.5pt;">Instrument Under Test</span>
+            <div class="fw-bold text-dark fs-6 mt-1">{{ session.instrument.display_name }}</div>
+            <div class="text-muted">Serial Number: <strong class="text-dark font-monospace">{{ session.instrument.serial_number }}</strong></div>
+            <div class="text-muted">Accuracy Class: <strong class="badge bg-primary">{{ session.instrument.get_accuracy_class_display }}</strong></div>
+            <div class="text-muted">Capacity: <span class="font-monospace">{{ session.instrument.min_capacity }} &mdash; {{ session.instrument.max_capacity }} {{ session.instrument.unit_of_measure }}</span></div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="p-3 bg-light rounded border">
+            <span class="text-muted text-uppercase fw-semibold" style="font-size: 7.5pt;">Session &amp; Governance</span>
+            <div class="fw-bold text-dark fs-6 mt-1">{{ session.session_number }}</div>
+            <div class="text-muted">Approval Status: <strong class="badge bg-success text-uppercase">{{ session.get_status_display }}</strong></div>
+            <div class="text-muted">Approved By: <strong class="text-dark">{{ session.reviewer.full_name|default:"Authorized Reviewer" }}</strong></div>
+            <div class="text-muted">Governing Standard: <span class="text-dark">{{ session.get_oiml_edition_display }}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="alert alert-warning py-3 small mb-4 border-0 shadow-sm">
+        <i class="bi bi-shield-exclamation text-warning fs-5 me-2"></i>
+        <strong>Version Control &amp; Traceability:</strong> Generating an updated report will mark any prior report versions for this session as <strong>superseded</strong>. Historical files remain permanently preserved in the audit archives.
+      </div>
+
+      <!-- Quick Download Action Bar for Active Reports -->
+      <div class="p-3 bg-light rounded border mb-4 d-flex flex-wrap justify-content-between align-items-center">
+        <div>
+          <span class="fw-bold text-dark small d-block">Direct Report Download:</span>
+          <span class="text-muted small">Download the latest approved test documentation in your preferred format.</span>
+        </div>
+        <div class="d-flex gap-2 mt-2 mt-sm-0">
+          <a href="{% url 'reports:session_download' session.pk 'pdf' %}" class="btn btn-danger btn-sm shadow-sm">
+            <i class="bi bi-file-earmark-pdf me-1"></i>Download PDF
+          </a>
+          <a href="{% url 'reports:session_download' session.pk 'docx' %}" class="btn btn-primary btn-sm shadow-sm">
+            <i class="bi bi-file-earmark-word me-1"></i>Download Word
+          </a>
+        </div>
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-4">
+          <label class="form-label fw-bold small text-uppercase text-secondary">Select Report Format</label>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="form-check p-3 border rounded bg-white h-100">
+                <input class="form-check-input" type="radio" name="report_type" id="type_both" value="BOTH" checked>
+                <label class="form-check-label fw-semibold text-dark d-block" for="type_both">
+                  <i class="bi bi-files text-primary me-1"></i>Both PDF &amp; Word
+                </label>
+                <div class="text-muted small mt-1">Generates synchronized PDF certificate and editable Word document under the same revision.</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check p-3 border rounded bg-white h-100">
+                <input class="form-check-input" type="radio" name="report_type" id="type_pdf" value="PDF">
+                <label class="form-check-label fw-semibold text-dark d-block" for="type_pdf">
+                  <i class="bi bi-file-earmark-pdf-fill text-danger me-1"></i>PDF Certificate Only
+                </label>
+                <div class="text-muted small mt-1">Standard ISO/IEC 17025 compliant ReportLab certificate.</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check p-3 border rounded bg-white h-100">
+                <input class="form-check-input" type="radio" name="report_type" id="type_docx" value="DOCX">
+                <label class="form-check-label fw-semibold text-dark d-block" for="type_docx">
+                  <i class="bi bi-file-earmark-word-fill text-primary me-1"></i>Word (.docx) Only
+                </label>
+                <div class="text-muted small mt-1">Fully editable Microsoft Word document with matching data and formatting.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 pt-2 border-top">
+          <button type="submit" class="btn btn-primary px-4 shadow-sm" data-loading-text="Compiling Official Report...">
+            <i class="bi bi-file-earmark-check me-1"></i>Generate Official Report
+          </button>
+          <a href="{% url 'reports:session_preview' session.pk %}" target="_blank" class="btn btn-outline-secondary">
+            <i class="bi bi-eye me-1"></i>Live PDF Preview
+          </a>
+          <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-link text-decoration-none">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="p-3 bg-white rounded border small text-muted">
+    <strong>Statutory Notice:</strong> This report documents testing under OIML R 76-1:2006 / EN 45501:2015. It relates solely to the instrument tested and does not claim OIML Certificate of Conformity or accreditation unless separately authorized and substantiated.
+  </div>
+
+</div>
+{% endblock %}

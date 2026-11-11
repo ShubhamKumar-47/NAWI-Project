@@ -1,0 +1,375 @@
+{% extends "base/_base.html" %}
+{% block title %}Test Results &amp; Validation — {{ session.session_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+  <!-- Top Navigation & Actions Header -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1 small">
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:list' %}">Test Sessions</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:detail' session.pk %}">{{ session.session_number }}</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Results &amp; Validation</li>
+        </ol>
+      </nav>
+      <h4 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-clipboard2-check text-primary me-2"></i>Laboratory Test Results &amp; Validation
+        <span class="badge bg-secondary ms-2 fs-6">OIML R 76 Standard</span>
+      </h4>
+    </div>
+    <div class="d-flex gap-2 align-items-center mt-2 mt-sm-0">
+      <a href="{% url 'test_sessions:results_print' session.pk %}" target="_blank" class="btn btn-outline-dark btn-sm shadow-sm">
+        <i class="bi bi-printer me-1"></i>Print-Friendly View
+      </a>
+      {% if can_recalculate %}
+      <form method="post" action="{% url 'calculations:session_recalculate' session.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-primary btn-sm" title="Re-evaluate all calculation rules">
+          <i class="bi bi-arrow-clockwise me-1"></i>Recalculate Results
+        </button>
+      </form>
+      {% endif %}
+      {% if can_validate_drafts %}
+      <form method="post" action="{% url 'test_sessions:validate_drafts' session.pk %}" class="d-inline"
+            onsubmit="return confirm('Confirm and validate all preliminary draft observations?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-warning btn-sm" title="Convert drafts into confirmed observations">
+          <i class="bi bi-check-all me-1"></i>Validate All Drafts ({{ report.total_drafts }})
+        </button>
+      </form>
+      {% endif %}
+      {% if can_submit %}
+      <form method="post" action="{% url 'test_sessions:submit' session.pk %}" class="d-inline"
+            onsubmit="return confirm('Submit this validated test record for technical review?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-sm shadow-sm">
+          <i class="bi bi-send-check me-1"></i>Submit for Review
+        </button>
+      </form>
+      {% elif not session.is_locked and session.status != 'APPROVED' and session.status != 'PENDING_REVIEW' %}
+      <button class="btn btn-secondary btn-sm" disabled title="Submission blocked: Resolve warnings or complete tests first">
+        <i class="bi bi-lock me-1"></i>Submit for Review (Blocked)
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Warning & Compliance Banners -->
+  {% if report.missing_data_warnings %}
+  <div class="alert alert-warning border-0 shadow-sm d-flex gap-3 align-items-start mb-3" role="alert">
+    <i class="bi bi-exclamation-triangle-fill text-warning fs-4 flex-shrink-0 mt-1"></i>
+    <div class="small">
+      <h6 class="alert-heading fw-bold mb-1">Missing Observation Data Detected</h6>
+      <ul class="mb-0 ps-3">
+        {% for w in report.missing_data_warnings %}
+        <li>{{ w }}</li>
+        {% endfor %}
+      </ul>
+      <span class="text-muted d-block mt-1">Per OIML R 76, a report cannot receive an overall PASS status if required tests are incomplete.</span>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if report.invalid_measurement_warnings %}
+  <div class="alert alert-danger border-0 shadow-sm d-flex gap-3 align-items-start mb-3" role="alert">
+    <i class="bi bi-exclamation-octagon-fill text-danger fs-4 flex-shrink-0 mt-1"></i>
+    <div class="small">
+      <h6 class="alert-heading fw-bold mb-1">Observation Warnings &amp; Pending Drafts</h6>
+      <ul class="mb-0 ps-3">
+        {% for w in report.invalid_measurement_warnings %}
+        <li>{{ w }}</li>
+        {% endfor %}
+      </ul>
+      {% if can_validate_drafts %}
+      <div class="mt-2">
+        <form method="post" action="{% url 'test_sessions:validate_drafts' session.pk %}" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Confirm and Validate Drafts Now</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if report.unverified_rule_warnings %}
+  <div class="alert alert-dark border-0 shadow-sm d-flex gap-3 align-items-start mb-3" role="alert">
+    <i class="bi bi-shield-x text-danger fs-4 flex-shrink-0 mt-1"></i>
+    <div class="small">
+      <h6 class="alert-heading fw-bold mb-1">Unverified Rule Set Warning</h6>
+      <ul class="mb-0 ps-3">
+        {% for w in report.unverified_rule_warnings %}
+        <li>{{ w }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Metrological Summary Card (Instrument & Test Reference) -->
+  <div class="card border-0 shadow-sm mb-4 bg-light">
+    <div class="card-body p-3">
+      <div class="row g-3 small">
+        <div class="col-md-3">
+          <span class="text-muted d-block">Instrument Identification</span>
+          <strong class="text-dark">{{ instrument.display_name }}</strong>
+          <span class="d-block text-muted">S/N: <strong class="text-dark font-monospace">{{ instrument.serial_number }}</strong></span>
+          <span class="d-block text-muted">Manufacturer: {{ instrument.manufacturer }}</span>
+        </div>
+        <div class="col-md-3">
+          <span class="text-muted d-block">Metrological Characteristics</span>
+          <span class="d-block">Class: <strong class="badge bg-primary">{{ instrument.get_accuracy_class_display }}</strong></span>
+          <span class="d-block font-monospace">Capacity: {{ instrument.min_capacity }} — {{ instrument.max_capacity }} {{ instrument.unit_of_measure }}</span>
+          <span class="d-block font-monospace">Intervals: e = {{ instrument.actual_scale_interval }} {{ instrument.unit_of_measure }}, d = {{ instrument.scale_interval }}</span>
+        </div>
+        <div class="col-md-3">
+          <span class="text-muted d-block">Test Reference &amp; Conditions</span>
+          <span class="d-block font-monospace fw-semibold">{{ session.session_number }}</span>
+          <span class="d-block text-muted">Date: {{ session.test_date|date:"Y-m-d" }}</span>
+          <span class="d-block text-muted">Ambient Temp: {{ session.temperature_range }}</span>
+          <span class="d-block text-muted">Humidity: {{ session.humidity_range }}</span>
+        </div>
+        <div class="col-md-3">
+          <span class="text-muted d-block">Personnel &amp; Standards</span>
+          <span class="d-block text-muted">Operator: <strong class="text-dark">{{ session.technician.full_name|default:session.technician.username }}</strong></span>
+          <span class="d-block text-muted">Reviewer: <strong>{{ session.reviewer.full_name|default:"Pending Review" }}</strong></span>
+          <span class="d-block text-muted">Standard: <span class="badge bg-dark font-monospace">{{ session.get_oiml_edition_display|default:session.oiml_edition }}</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overall Test Status & Procedure Summary Grid -->
+  <div class="row g-3 mb-4">
+    <!-- Overall Status Card -->
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm p-3 h-100 bg-white border-start border-4 {% if report.overall_status == 'PASS' %}border-success{% elif report.overall_status == 'FAIL' %}border-danger{% else %}border-warning{% endif %}">
+        <span class="text-muted small fw-semibold text-uppercase">Overall Metrological Compliance</span>
+        <div class="d-flex align-items-center gap-2 mt-2">
+          {% if report.overall_status == 'PASS' %}
+          <span class="fs-2 fw-bold text-success"><i class="bi bi-check-circle-fill me-2"></i>PASS</span>
+          {% elif report.overall_status == 'FAIL' %}
+          <span class="fs-2 fw-bold text-danger"><i class="bi bi-x-circle-fill me-2"></i>FAIL</span>
+          {% elif report.overall_status == 'UNVERIFIED_RULES' %}
+          <span class="fs-3 fw-bold text-dark"><i class="bi bi-shield-x me-2 text-danger"></i>UNVERIFIED</span>
+          {% else %}
+          <span class="fs-2 fw-bold text-warning"><i class="bi bi-clock-history me-2"></i>INCOMPLETE</span>
+          {% endif %}
+        </div>
+        <p class="small text-muted mt-2 mb-0">
+          {% if report.overall_status == 'PASS' %}
+          All active test procedures have been evaluated against OIML R 76 MPE limits with zero non-conformances.
+          {% elif report.overall_status == 'FAIL' %}
+          One or more measurement errors exceed maximum permissible error limits.
+          {% else %}
+          {{ report.blocking_reasons.0|default:"Evaluation pending full observation logging or confirmation." }}
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <!-- Procedure-Wise Status Matrix -->
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm p-3 h-100 bg-white">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-semibold text-uppercase">Procedure-Wise Result Summary</span>
+          <span class="badge bg-light text-dark font-monospace border">{{ report.total_passed }}/{{ report.total_observations }} Observations Passed</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle table-hover mb-0">
+            <thead class="table-light">
+              <tr class="small text-uppercase text-secondary">
+                <th>Procedure</th>
+                <th>Standard Clause</th>
+                <th>Observations</th>
+                <th>Status</th>
+                <th class="text-end">Jump To</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p_code, p in report.procedure_summaries.items %}
+              <tr>
+                <td><strong class="text-dark small">{{ p.name }}</strong></td>
+                <td class="font-monospace text-primary small">{{ p.clause }}</td>
+                <td class="small">
+                  {{ p.total_count }} record{{ p.total_count|pluralize }}
+                  {% if p.draft_count > 0 %}
+                  <span class="badge bg-warning text-dark font-monospace">({{ p.draft_count }} draft)</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if p.status == 'PASS' %}
+                  <span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>PASS</span>
+                  {% elif p.status == 'FAIL' %}
+                  <span class="badge bg-danger"><i class="bi bi-x-lg me-1"></i>FAIL</span>
+                  {% else %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>INCOMPLETE</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <a href="#section-{{ p_code }}" class="btn btn-sm btn-outline-secondary py-0 px-2 small">
+                    <i class="bi bi-arrow-down-short"></i>View
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detailed Results Tables for Each Procedure -->
+  {% for p_code, p in report.procedure_summaries.items %}
+  <div class="card shadow-sm border-0 mb-4" id="section-{{ p_code }}">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+      <div>
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-journal-check text-primary me-2"></i>{{ p.name }}
+        </h6>
+        <small class="text-muted">Clause: <span class="font-monospace text-primary">{{ p.clause }}</span></small>
+      </div>
+      <div class="d-flex gap-2 align-items-center">
+        {% if p.status == 'PASS' %}
+        <span class="badge bg-success fs-6"><i class="bi bi-check-lg me-1"></i>PASS</span>
+        {% elif p.status == 'FAIL' %}
+        <span class="badge bg-danger fs-6"><i class="bi bi-x-lg me-1"></i>FAIL</span>
+        {% else %}
+        <span class="badge bg-warning text-dark fs-6"><i class="bi bi-clock me-1"></i>INCOMPLETE</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Missing warnings alert inside card if applicable -->
+    {% if p.missing_warnings or p.invalid_warnings %}
+    <div class="card-body bg-light bg-opacity-50 py-2 px-3 border-bottom small">
+      {% for mw in p.missing_warnings %}
+      <div class="text-warning-emphasis"><i class="bi bi-exclamation-triangle me-1"></i>{{ mw }}</div>
+      {% endfor %}
+      {% for iw in p.invalid_warnings %}
+      <div class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>{{ iw }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card-body p-0">
+      {% if p.items %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle table-hover mb-0">
+          <thead class="table-light">
+            <tr class="small text-uppercase text-secondary">
+              <th style="width: 50px;">#</th>
+              <th>Description / Load Point</th>
+              <th>Reference Load</th>
+              <th>Indication</th>
+              <th>Zero Ind. / Tare</th>
+              <th>Calculated Error</th>
+              <th>Permissible Error (MPE)</th>
+              <th>Verdict</th>
+              <th class="text-end pe-3">Math Explanation</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in p.items %}
+            <tr class="{% if item.status == 'PASS' %}table-success bg-opacity-25{% elif item.status == 'FAIL' %}table-danger bg-opacity-25{% elif item.is_draft %}table-warning bg-opacity-25{% endif %}">
+              <td class="text-muted small">{{ forloop.counter }}</td>
+              <td>
+                <strong class="text-dark small d-block">{{ item.title }}</strong>
+                {% if item.is_draft %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-pencil me-1"></i>Draft</span>
+                {% endif %}
+              </td>
+              <td class="font-monospace fw-semibold">
+                {% if item.ref_load is not None %}{{ item.ref_load }} {{ instrument.unit_of_measure }}{% else %}—{% endif %}
+              </td>
+              <td class="font-monospace text-primary fw-semibold">
+                {% if item.indication is not None %}{{ item.indication }} {{ instrument.unit_of_measure }}
+                {% elif item.indication_after is not None %}{{ item.indication_after }} {{ instrument.unit_of_measure }}
+                {% else %}—{% endif %}
+              </td>
+              <td class="font-monospace text-muted small">
+                {% if item.zero_indication is not None %}{{ item.zero_indication }}{% elif item.tare is not None %}{{ item.tare }}{% else %}0.0000{% endif %}
+              </td>
+              <td class="font-monospace fw-bold {% if item.status == 'FAIL' %}text-danger{% else %}text-dark{% endif %}">
+                {% if item.error is not None %}{{ item.error }}
+                {% elif item.change is not None %}{{ item.change }}
+                {% else %}—{% endif %}
+              </td>
+              <td class="font-monospace text-muted small">
+                {% if item.mpe is not None %}&plusmn;{{ item.mpe }}{% else %}—{% endif %}
+              </td>
+              <td>
+                {% if item.is_draft %}
+                <span class="badge bg-warning text-dark">DRAFT</span>
+                {% elif item.status == 'PASS' %}
+                <span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>PASS</span>
+                {% elif item.status == 'FAIL' %}
+                <span class="badge bg-danger"><i class="bi bi-x-lg me-1"></i>FAIL</span>
+                {% else %}
+                <span class="badge bg-secondary">PENDING</span>
+                {% endif %}
+              </td>
+              <td class="text-end pe-3">
+                {% if item.explanation %}
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                        data-bs-toggle="collapse" data-bs-target="#exp-{{ p_code }}-{{ item.id }}"
+                        aria-expanded="false" title="View calculation steps">
+                  <i class="bi bi-info-circle me-1"></i>Formula
+                </button>
+                {% else %}
+                <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% if item.explanation %}
+            <tr class="collapse bg-light" id="exp-{{ p_code }}-{{ item.id }}">
+              <td colspan="9" class="p-3">
+                <div class="card border-0 bg-white p-2 shadow-sm font-monospace text-dark small">
+                  <i class="bi bi-calculator text-primary me-2"></i>{{ item.explanation }}
+                </div>
+              </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% elif p_code == 'initial_examination' %}
+      <div class="p-3">
+        <p class="small text-muted mb-0">
+          Rating plates, markings, verification scale interval indicators, and levelling bubble verified satisfactory.
+        </p>
+      </div>
+      {% else %}
+      <div class="text-center py-4 text-muted small">
+        <i class="bi bi-inbox fs-3 d-block mb-1 text-secondary"></i>
+        No observation records recorded yet for this procedure.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- Bottom Navigation -->
+  <div class="d-flex justify-content-between align-items-center pt-3 border-top mb-4">
+    <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back to Session Overview
+    </a>
+    <div class="d-flex gap-2">
+      <a href="{% url 'test_sessions:results_print' session.pk %}" target="_blank" class="btn btn-outline-dark btn-sm">
+        <i class="bi bi-printer me-1"></i>Print Results View
+      </a>
+      {% if can_submit %}
+      <form method="post" action="{% url 'test_sessions:submit' session.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-send-check me-1"></i>Submit for Technical Approval
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

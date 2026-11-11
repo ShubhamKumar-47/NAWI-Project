@@ -1,0 +1,109 @@
+{% extends "base/_base.html" %}
+{% block title %}Add Weighing Measurement — {{ session.session_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0" style="max-width: 800px;">
+  <div class="mb-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1 small">
+        <li class="breadcrumb-item"><a href="{% url 'test_sessions:list' %}">Test Sessions</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'test_sessions:detail' session.pk %}">{{ session.session_number }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'measurements:weighing_list' session.pk %}">Weighing Test</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Add Observation</li>
+      </ol>
+    </nav>
+    <h4 class="mb-0 fw-bold text-dark">
+      <i class="bi bi-plus-circle text-primary me-2"></i>Record Weighing Observation
+    </h4>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-white py-3 border-bottom">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <span class="text-muted small d-block">Instrument</span>
+          <strong>{{ instrument.display_name }} (Class {{ instrument.get_accuracy_class_display }})</strong>
+        </div>
+        <span class="badge bg-light text-dark font-monospace">e = {{ instrument.actual_scale_interval }} {{ instrument.unit_of_measure }}</span>
+      </div>
+    </div>
+    <form method="post" class="card-body p-4">
+      {% csrf_token %}
+      {% if form.errors %}
+      <div class="alert alert-danger mb-3">
+        <strong>Please correct the following errors:</strong>
+        <ul class="mb-0 mt-1 small">
+          {% for field, errors in form.errors.items %}
+            {% for error in errors %}
+              <li>{{ field|title }}: {{ error }}</li>
+            {% endfor %}
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Test Direction *</label>
+          {{ form.test_type }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Sequence Order *</label>
+          {{ form.sequence_order }}
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Applied Reference Load ({{ instrument.unit_of_measure }}) *</label>
+          {{ form.nominal_load }}
+          <div class="form-text">Reference test load applied (min {{ instrument.min_capacity }}, max {{ instrument.max_capacity }}).</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Displayed Indication ({{ instrument.unit_of_measure }}) *</label>
+          {{ form.indication }}
+          <div class="form-text">Value shown on the instrument indicator.</div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Zero Indication Before Load</label>
+          {{ form.zero_indication }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Tare Applied ({{ instrument.unit_of_measure }})</label>
+          {{ form.tare_applied }}
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Ambient Temperature (°C)</label>
+          {{ form.temperature }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Observations / Remarks</label>
+          {{ form.observations }}
+        </div>
+      </div>
+
+      <div class="form-check form-switch mb-4">
+        {{ form.is_draft }}
+        <label class="form-check-label small" for="{{ form.is_draft.id_for_label }}">
+          Save as preliminary draft (unvalidated observation)
+        </label>
+      </div>
+
+      <div class="d-flex justify-content-between pt-3 border-top">
+        <a href="{% url 'measurements:weighing_list' session.pk %}" class="btn btn-outline-secondary">
+          <i class="bi bi-x me-1"></i>Cancel
+        </a>
+        <button type="submit" class="btn btn-primary px-4">
+          <i class="bi bi-check-circle me-1"></i>Save Observation
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,504 @@
+{% extends "base/_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}Test Record: {{ session.session_number }} — NAWI TRMS{% endblock %}
+
+{% block breadcrumb %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"Test Sessions","url":"/sessions/"},{"label":"Test Record Details"}]'|safe %}
+{% endblock %}
+
+{% block content %}
+<!-- ── Top Action Header ────────────────────────────────────────────────── -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+      <h4 class="mb-0 fw-bold font-monospace text-dark">{{ session.session_number }}</h4>
+      {% include "components/_status_badge.html" with status=session.status %}
+      {% include "components/_pass_fail_badge.html" with result=session.overall_result %}
+      {% if session.is_locked %}
+      <span class="badge bg-dark"><i class="bi bi-lock-fill me-1"></i>Locked</span>
+      {% else %}
+      <span class="badge bg-light text-dark border"><i class="bi bi-unlock me-1"></i>Unlocked</span>
+      {% endif %}
+    </div>
+    <div class="text-muted small">
+      <span class="me-3">
+        <i class="bi bi-tools me-1"></i>{{ session.instrument.manufacturer }} {{ session.instrument.model_name }}
+        (S/N: <code>{{ session.instrument.serial_number }}</code>)
+      </span>
+      {% if session.lab_reference_number %}
+      <span class="font-monospace me-3"><i class="bi bi-tag me-1"></i>Ref: <strong>{{ session.lab_reference_number }}</strong></span>
+      {% endif %}
+      <span><i class="bi bi-calendar3 me-1"></i>{{ session.test_date|date:"d M Y" }}</span>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 flex-wrap">
+    {% if can_edit_session %}
+    <a href="{% url 'test_sessions:edit' session.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-pencil me-1"></i>Edit Record
+    </a>
+    <a href="{% url 'test_sessions:procedure_config' session.pk %}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-toggles me-1"></i>Configure Procedures
+    </a>
+    {% endif %}
+
+    {% if can_submit_session %}
+    <form method="post" action="{% url 'test_sessions:submit' session.pk %}" class="d-inline">
+      {% csrf_token %}
+      <button class="btn btn-warning btn-sm" onclick="return confirm('Submit this test record for reviewer verification?')">
+        <i class="bi bi-send me-1"></i>Submit for Review
+      </button>
+    </form>
+    {% endif %}
+
+    {% if can_approve_session %}
+    <form method="post" action="{% url 'test_sessions:approve' session.pk %}" class="d-inline"
+          onsubmit="return confirm('Approve this session and permanently lock it under legal metrology compliance?')">
+      {% csrf_token %}
+      <button class="btn btn-success btn-sm">
+        <i class="bi bi-check-circle me-1"></i>Approve &amp; Lock
+      </button>
+    </form>
+    <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#rejectModal">
+      <i class="bi bi-x-circle me-1"></i>Reject
+    </button>
+    {% endif %}
+
+    {% if session.status == 'APPROVED' or session.status == 'REPORT_GENERATED' %}
+    <a href="{% url 'reports:session_download' session.pk 'pdf' %}" class="btn btn-danger btn-sm shadow-sm" title="Download official PDF certificate">
+      <i class="bi bi-file-earmark-pdf me-1"></i>Download PDF
+    </a>
+    <a href="{% url 'reports:session_download' session.pk 'docx' %}" class="btn btn-primary btn-sm shadow-sm" title="Download editable Word report">
+      <i class="bi bi-file-earmark-word me-1"></i>Download Word
+    </a>
+    <a href="{% url 'reports:generate' session.pk %}" class="btn btn-outline-secondary btn-sm" title="Configure or regenerate official test report">
+      <i class="bi bi-file-earmark-diff me-1"></i>Report Options
+    </a>
+    {% if can_approve_session %}
+    <a href="{% url 'reports:initiate_revision' session.pk %}" class="btn btn-outline-warning btn-sm" title="Initiate formal controlled revision under change-control rules">
+      <i class="bi bi-arrow-repeat me-1"></i>Controlled Revision
+    </a>
+    {% endif %}
+    {% endif %}
+
+    <a href="{% url 'calculations:session_results' session.pk %}" class="btn btn-outline-info btn-sm">
+      <i class="bi bi-calculator me-1"></i>Calculation Results
+    </a>
+
+    {% if can_approve_session %}
+    <a href="{% url 'test_sessions:review' session.pk %}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-shield-check me-1"></i>Review Console
+    </a>
+    {% endif %}
+
+    <a href="{% url 'test_sessions:list' %}" class="btn btn-outline-dark btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>All Sessions
+    </a>
+  </div>
+</div>
+
+<!-- Rejection Notice if applicable -->
+{% if session.status == 'REJECTED' and session.rejection_reason %}
+<div class="alert alert-danger d-flex gap-3 align-items-start mb-4 shadow-sm" role="alert">
+  <i class="bi bi-exclamation-octagon-fill fs-4 text-danger flex-shrink-0 mt-1"></i>
+  <div>
+    <h6 class="alert-heading fw-bold mb-1">Returned for Technical Remediation</h6>
+    <p class="mb-0 small">{{ session.rejection_reason }}</p>
+    {% if session.reviewer %}
+    <small class="text-muted d-block mt-1">
+      Reviewed by: <strong>{% if session.reviewer %}{{ session.reviewer.get_full_name|default:session.reviewer.username }}{% endif %}</strong>
+    </small>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-4 mb-4">
+  <!-- ── Left Column: Linked Instrument & Selected Test Procedures ─────── -->
+  <div class="col-lg-8">
+
+    <!-- Card 1: Linked Instrument Metrological Summary -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-cpu text-primary me-2"></i>Linked Instrument Specifications
+        </h6>
+        <a href="{% url 'instruments:detail' session.instrument.pk %}" class="btn btn-sm btn-outline-primary py-0 px-2 small">
+          View Instrument Spec Sheet <i class="bi bi-box-arrow-up-right ms-1"></i>
+        </a>
+      </div>
+      <div class="card-body p-3">
+        <div class="row g-3 small">
+          <div class="col-sm-6 col-md-3">
+            <span class="text-muted d-block">Instrument</span>
+            <strong class="text-dark">{{ session.instrument.display_name }}</strong>
+            <span class="d-block text-muted">{{ session.instrument.manufacturer }}</span>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <span class="text-muted d-block">Serial Number &amp; Owner</span>
+            <code class="fw-bold text-primary">{{ session.instrument.serial_number }}</code>
+            <span class="d-block text-muted text-truncate">{{ session.instrument.customer_name|default:"Internal Lab" }}</span>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <span class="text-muted d-block">Class &amp; Max</span>
+            <span class="badge bg-primary">Class {{ session.instrument.accuracy_class }}</span>
+            <span class="d-block font-monospace text-dark fw-bold">Max: {{ session.instrument.max_capacity }} {{ session.instrument.unit_of_measurement }}</span>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <span class="text-muted d-block">Intervals &amp; Count</span>
+            <span class="d-block font-monospace text-dark">e = {{ session.instrument.actual_scale_interval }} {{ session.instrument.unit_of_measurement }}</span>
+            <span class="d-block font-monospace text-muted">d = {{ session.instrument.scale_interval }} | n = {{ session.instrument.n_max|default:"—" }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Applicable Test Procedures & Observation Execution -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <div>
+          <h6 class="mb-0 fw-bold text-dark">
+            <i class="bi bi-card-checklist text-primary me-2"></i>Applicable Test Procedures ({{ active_procedures_count }} Active)
+          </h6>
+          <small class="text-muted">Procedures configured per OIML R 76 recommendation requirements</small>
+        </div>
+        {% if can_edit_session %}
+        <a href="{% url 'test_sessions:procedure_config' session.pk %}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-gear me-1"></i>Configure
+        </a>
+        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light small text-uppercase text-muted border-bottom">
+              <tr>
+                <th class="ps-3">Procedure Name</th>
+                <th>Standard Clause</th>
+                <th>Status / Records</th>
+                <th class="text-end pe-3">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in selected_procedures %}
+              <tr>
+                <td class="ps-3">
+                  <div class="fw-bold text-dark">{{ p.name }}</div>
+                  <small class="text-muted">{{ p.description }}</small>
+                </td>
+                <td class="small font-monospace text-primary">
+                  {{ p.clause }}
+                </td>
+                <td>
+                  {% if p.is_measurement %}
+                    {% if p.count > 0 %}
+                    <span class="badge bg-success bg-opacity-10 text-success fw-bold px-2 py-1">
+                      <i class="bi bi-check-circle me-1"></i>{{ p.count }} Observation{{ p.count|pluralize }}
+                    </span>
+                    {% else %}
+                    <span class="badge bg-warning bg-opacity-10 text-warning fw-bold px-2 py-1">
+                      <i class="bi bi-clock me-1"></i>0 Records Pending
+                    </span>
+                    {% endif %}
+                  {% else %}
+                    {% if p.status == 'PASS' %}
+                    <span class="badge bg-success px-2 py-1"><i class="bi bi-check-lg me-1"></i>Satisfactory</span>
+                    {% else %}
+                    <span class="badge bg-danger px-2 py-1"><i class="bi bi-x-lg me-1"></i>Failed Check</span>
+                    {% endif %}
+                  {% endif %}
+                </td>
+                <td class="text-end pe-3 text-nowrap">
+                  {% if p.is_measurement %}
+                  <a href="{{ p.url }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-table me-1"></i>Enter / View Observations
+                  </a>
+                  {% else %}
+                  <a href="#initial-observations" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-eye me-1"></i>View Observations
+                  </a>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="4" class="text-center text-muted py-4">
+                  No active test procedures configured. <a href="{% url 'test_sessions:procedure_config' session.pk %}">Configure procedures</a>.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Non-Measurement Observations (Initial Exam & Zero Check) -->
+    <div class="card shadow-sm border-0 mb-4" id="initial-observations">
+      <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-clipboard-check text-primary me-2"></i>Initial Examination &amp; Zero-Setting Observations
+        </h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <!-- Initial Examination -->
+          <div class="col-md-6">
+            <div class="p-3 border rounded bg-light bg-opacity-25 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold text-dark">Initial Visual &amp; Functional Examination</span>
+                {% if session.initial_examination_passed %}
+                <span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Satisfactory</span>
+                {% else %}
+                <span class="badge bg-danger"><i class="bi bi-x-lg me-1"></i>Unsatisfactory</span>
+                {% endif %}
+              </div>
+              <p class="small text-muted mb-0">
+                {{ session.initial_examination_notes|default:"Rating plates, markings, and leveling bubble verified satisfactory per OIML R 76 §A.3." }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Zero Setting -->
+          <div class="col-md-6">
+            <div class="p-3 border rounded bg-light bg-opacity-25 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold text-dark">Zero-Setting &amp; Zero-Tracking</span>
+                {% if session.zero_test_passed %}
+                <span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Within &plusmn;0.25e</span>
+                {% else %}
+                <span class="badge bg-danger"><i class="bi bi-x-lg me-1"></i>Exceeds Tolerance</span>
+                {% endif %}
+              </div>
+              <p class="small text-muted mb-0">
+                {{ session.zero_test_notes|default:"Zero-setting error tested at zero load; indication returns cleanly within ±0.25e per OIML R 76 §A.4.1." }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Remarks -->
+        {% if session.remarks %}
+        <div class="mt-3 pt-3 border-top">
+          <span class="fw-bold text-dark small d-block mb-1">Technician Remarks &amp; Observations:</span>
+          <div class="p-3 bg-light rounded small text-secondary">
+            {{ session.remarks|linebreaks }}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Right Column: Test Metadata, Environment, Standards, Audit ─────── -->
+  <div class="col-lg-4">
+
+    <!-- Card 4: Test Record Identification Details -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-info-circle text-primary me-2"></i>Test Identification
+        </h6>
+      </div>
+      <div class="card-body small">
+        <dl class="row mb-0">
+          <dt class="col-sm-5 text-muted">Test ID:</dt>
+          <dd class="col-sm-7 font-monospace fw-bold text-primary">{{ session.session_number }}</dd>
+
+          <dt class="col-sm-5 text-muted">Lab Reference #:</dt>
+          <dd class="col-sm-7 font-monospace fw-bold text-dark">{{ session.lab_reference_number|default:"—" }}</dd>
+
+          <dt class="col-sm-5 text-muted">Test Date:</dt>
+          <dd class="col-sm-7 text-dark">{{ session.test_date|date:"d F Y" }}</dd>
+
+          <dt class="col-sm-5 text-muted">Test Location:</dt>
+          <dd class="col-sm-7 text-dark">{{ session.test_location|default:"Metrology Calibration Bay" }}</dd>
+
+          <dt class="col-sm-5 text-muted">Operator:</dt>
+          <dd class="col-sm-7 text-dark fw-semibold">
+            {% if session.technician %}{{ session.technician.get_full_name|default:session.technician.username }}{% else %}—{% endif %}
+          </dd>
+
+          <dt class="col-sm-5 text-muted">Reviewer:</dt>
+          <dd class="col-sm-7 text-dark">
+            {% if session.reviewer %}
+            <span class="text-success fw-semibold">{{ session.reviewer.get_full_name|default:session.reviewer.username }}</span>
+            {% else %}
+            <span class="text-muted">Awaiting Review</span>
+            {% endif %}
+          </dd>
+
+          <dt class="col-sm-5 text-muted">OIML Standard:</dt>
+          <dd class="col-sm-7">
+            <span class="badge bg-light text-dark border font-monospace">{{ session.get_oiml_edition_display }}</span>
+          </dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Card 5: Environmental Conditions -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-thermometer-half text-primary me-2"></i>Environmental Conditions
+        </h6>
+      </div>
+      <div class="card-body small">
+        <div class="row g-2 text-center mb-3">
+          <div class="col-6">
+            <div class="p-2 border rounded bg-light">
+              <span class="text-muted d-block small">Temperature</span>
+              <strong class="text-dark fs-6">{{ session.temperature_range }}</strong>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 border rounded bg-light">
+              <span class="text-muted d-block small">Relative Humidity</span>
+              <strong class="text-dark fs-6">{{ session.humidity_range }}</strong>
+            </div>
+          </div>
+        </div>
+        <p class="text-muted small mb-0">
+          <i class="bi bi-check-circle text-success me-1"></i>Conditions monitored per OIML R 76 §5.3.1.
+        </p>
+      </div>
+    </div>
+
+    <!-- Card 6: Reference Standards Used -->
+    {% if session.reference_standards %}
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-bookmark-check text-primary me-2"></i>Reference Standards
+        </h6>
+      </div>
+      <div class="card-body small text-muted">
+        <pre class="mb-0 bg-light p-2 rounded small font-monospace">{{ session.reference_standards }}</pre>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if session.reports.all %}
+    <!-- Card: Generated Test Reports Repository -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-file-earmark-check text-primary me-2"></i>Official Reports
+        </h6>
+        <span class="badge bg-secondary">{{ session.reports.count }}</span>
+      </div>
+      <div class="card-body p-0 small">
+        <ul class="list-group list-group-flush">
+          {% for r in session.reports.all|slice:":6" %}
+          <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+            <div>
+              <div class="fw-bold font-monospace text-dark" style="font-size: 8pt;">{{ r.report_number }}</div>
+              <div class="text-muted" style="font-size: 7.5pt;">
+                {% if r.report_type == 'PDF' %}
+                <span class="text-danger fw-semibold"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</span>
+                {% else %}
+                <span class="text-primary fw-semibold"><i class="bi bi-file-earmark-word me-1"></i>Word</span>
+                {% endif %}
+                &bull; {{ r.generated_at|date:"M d, H:i" }}
+                {% if r.is_superseded %}<span class="badge bg-secondary text-white" style="font-size: 6.5pt;">Superseded</span>{% endif %}
+              </div>
+            </div>
+            <div class="btn-group btn-group-sm">
+              {% if r.report_type == 'PDF' %}
+              <a href="{% url 'reports:preview' r.pk %}" target="_blank" class="btn btn-outline-secondary py-0 px-2" title="Preview PDF">
+                <i class="bi bi-eye"></i>
+              </a>
+              {% endif %}
+              <a href="{% url 'reports:download' r.pk %}" class="btn btn-outline-primary py-0 px-2" title="Download file">
+                <i class="bi bi-download"></i>
+              </a>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Card 7: Audit Timeline & Traceability -->
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="mb-0 fw-bold text-dark">
+          <i class="bi bi-clock-history text-primary me-2"></i>Audit History &amp; Traceability
+        </h6>
+      </div>
+      <div class="card-body small text-muted">
+        <div class="mb-2">
+          <i class="bi bi-person me-1"></i>Created by:
+          <strong class="text-dark">{% if session.created_by %}{{ session.created_by.get_full_name|default:session.created_by.username }}{% else %}System{% endif %}</strong>
+        </div>
+        <div class="mb-2">
+          <i class="bi bi-calendar-plus me-1"></i>Created:
+          <span class="text-dark">{{ session.created_at|date:"d M Y, H:i" }}</span>
+        </div>
+        <div class="mb-2">
+          <i class="bi bi-arrow-repeat me-1"></i>Last Updated:
+          <span class="text-dark">{{ session.updated_at|date:"d M Y, H:i" }}</span>
+        </div>
+        <div>
+          <i class="bi bi-shield-lock me-1"></i>Integrity Status:
+          {% if session.is_locked %}
+          <span class="badge bg-success"><i class="bi bi-lock-fill me-1"></i>Approved &amp; Immutable</span>
+          {% else %}
+          <span class="badge bg-secondary"><i class="bi bi-pencil me-1"></i>Editable</span>
+          {% endif %}
+        </div>
+        {% if session.approval_history.all %}
+        <hr class="my-2">
+        <div class="fw-semibold text-dark mb-1">Approval Log:</div>
+        {% for h in session.approval_history.all|slice:":4" %}
+        <div class="mb-1 pb-1 border-bottom">
+          <div class="d-flex justify-content-between">
+            <span class="badge bg-light text-dark border">{{ h.get_action_display }}</span>
+            <small class="text-muted">{{ h.created_at|date:"M d, H:i" }}</small>
+          </div>
+          <div class="text-secondary mt-1"><small>By: {{ h.actor.full_name }}</small></div>
+          {% if h.comments %}
+          <div class="text-dark bg-light p-1 rounded mt-1 font-monospace" style="font-size: 8pt;">{{ h.comments }}</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Rejection Modal (for Reviewers) ──────────────────────────────────── -->
+{% if can_approve_session %}
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-danger bg-opacity-10">
+        <h5 class="modal-title text-danger fw-bold" id="rejectModalLabel">
+          <i class="bi bi-x-circle me-2"></i>Return Test Record for Correction
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{% url 'test_sessions:reject' session.pk %}">
+        {% csrf_token %}
+        <div class="modal-body p-4">
+          <p class="small text-muted mb-3">
+            Please provide technical rejection comments and required remediation. The technician will be notified to revise observations.
+          </p>
+          {% crispy rejection_form %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">Confirm Rejection</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

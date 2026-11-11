@@ -1,0 +1,95 @@
+# Render Infrastructure Blueprint for NAWI Test Report Management System (NTRMS)
+# Documentation: https://render.com/docs/blueprint-spec
+
+services:
+  # ── Web Application Service ───────────────────────────────────────────────
+  - type: web
+    name: nawi-trms-web
+    env: python
+    region: oregon
+    plan: standard
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --threads 2 --timeout 120"
+    healthCheckPath: "/accounts/login/"
+    disk:
+      name: nawi-media-storage
+      mountPath: /var/data/media
+      sizeGB: 10
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nawi-trms-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: nawi-trms-redis
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com,localhost,127.0.0.1"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://*.onrender.com"
+      - key: SECURE_SSL_REDIRECT
+        value: "true"
+      - key: SECURE_HSTS_SECONDS
+        value: "31536000"
+      - key: ADMIN_EMAIL
+        value: admin@nawi.local
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_ORG
+        value: National Metrology Testing Center
+      - key: ACCREDITATION_NUMBER
+        value: ISO-17025-NTRMS-001
+
+  # ── Optional Celery Background Worker ─────────────────────────────────────
+  - type: worker
+    name: nawi-trms-worker
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "celery -A config worker -l info --concurrency 2"
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: nawi-trms-web
+          envVarKey: SECRET_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nawi-trms-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: nawi-trms-redis
+          property: connectionString
+
+# ── Managed PostgreSQL Database ──────────────────────────────────────────────
+databases:
+  - name: nawi-trms-db
+    region: oregon
+    plan: standard
+    databaseName: nawi_trms
+    user: nawi_user
+    postgresMajorVersion: "16"
+
+# ── Optional Managed Redis (for Celery & Cache) ──────────────────────────────
+# (Uncomment below if background asynchronous worker is deployed)
+# - type: redis
+#   name: nawi-trms-redis
+#   region: oregon
+#   plan: starter
+#   maxmemoryPolicy: noeviction
+

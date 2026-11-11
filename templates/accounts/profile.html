@@ -1,0 +1,53 @@
+{% extends "base/_base.html" %}
+{% load crispy_forms_tags %}
+{% block title %}My Profile — NAWI TRMS{% endblock %}
+
+{% block breadcrumb %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"My Account"},{"label":"Profile"}]'|safe %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom">
+  <div>
+    <h3 class="mb-0 fw-bold text-dark">
+      <i class="bi bi-person-circle text-primary me-2"></i>My Personnel Profile
+    </h3>
+    <p class="text-muted small mb-0 mt-1">
+      Manage your user credentials, laboratory contact info, and signatory details.
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'accounts:password_change' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-key me-1"></i>Change Password
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm mb-3 bg-white">
+      <div class="card-body text-center py-4">
+        <div class="avatar-circle avatar-lg bg-primary text-white mx-auto mb-3 shadow">
+          {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+        </div>
+        <h5 class="mb-1 fw-bold text-dark">{{ user.full_name }}</h5>
+        <p class="text-muted small mb-1">{{ user.get_role_display }}</p>
+        <p class="text-muted small mb-2"><i class="bi bi-building me-1"></i>{{ user.organization.name|default:"Metrology Testing Center" }}</p>
+        {% if user.job_title %}
+        <span class="badge badge-soft-info">{{ user.job_title }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card border-0 shadow-sm bg-white">
+      <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-person-gear text-primary me-2"></i>Edit Profile Information</h6>
+      </div>
+      <div class="card-body p-4">
+        {% crispy form %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,282 @@
+{% extends "base/_base.html" %}
+{% block title %}Discrimination Test — {{ session.session_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+  <!-- Top Navigation & Action Header -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1 small">
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:list' %}">Test Sessions</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:detail' session.pk %}">{{ session.session_number }}</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Discrimination Test</li>
+        </ol>
+      </nav>
+      <h4 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-activity text-primary me-2"></i>Discrimination Test
+        <span class="badge bg-secondary ms-2 fs-6">OIML R 76 §A.4.8</span>
+      </h4>
+    </div>
+    <div class="d-flex gap-2 align-items-center mt-2 mt-sm-0">
+      <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to Session
+      </a>
+      {% if not session.is_locked %}
+      <a href="{% url 'measurements:discrimination_add' session.pk %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-plus-circle me-1"></i>Single Observation Form
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Instrument Metrological Banner -->
+  <div class="card border-0 shadow-sm mb-4 bg-light">
+    <div class="card-body py-2 px-3">
+      <div class="row g-2 align-items-center small">
+        <div class="col-md-3">
+          <span class="text-muted d-block">Instrument</span>
+          <strong class="text-dark">{{ instrument.display_name }} ({{ instrument.model_number }})</strong>
+        </div>
+        <div class="col-md-2">
+          <span class="text-muted d-block">Scale Interval (d)</span>
+          <span class="font-monospace fw-semibold text-primary">d = {{ instrument.scale_interval }} {{ instrument.unit_of_measure }}</span>
+        </div>
+        <div class="col-md-3">
+          <span class="text-muted d-block">Suggested Additional Load (1.4d)</span>
+          <span class="font-monospace fw-bold text-success">ΔL ≈ {% widthratio instrument.scale_interval 1 1.4 as s_delta %}{{ instrument.scale_interval|floatformat:4 }} &times; 1.4 {{ instrument.unit_of_measure }}</span>
+        </div>
+        <div class="col-md-2">
+          <span class="text-muted d-block">Required Response</span>
+          <span class="badge bg-secondary">ΔI ≥ 1d</span>
+        </div>
+        <div class="col-md-2 text-md-end">
+          <span class="text-muted d-block">Test Session Status</span>
+          {% include "components/_status_badge.html" with status=session.status %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standard Metrological Requirements Callout -->
+  <div class="alert alert-info border-0 shadow-sm d-flex gap-2 py-2 mb-4">
+    <i class="bi bi-info-circle-fill flex-shrink-0 mt-1 fs-5"></i>
+    <div class="small">
+      <strong>OIML R 76 §A.4.8 Discrimination Criterion:</strong> An additional load of \(1.4d\) gently placed on the loaded load receptor
+      shall cause an increase of indication of at least \(1d\) (\(I_2 - I_1 \ge 1d\)). This test shall be performed at Min, \(0.5\text{ Max}\), and Max.
+    </div>
+  </div>
+
+  <!-- Dynamic Batch Observation Entry Form -->
+  {% if not session.is_locked %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-input-cursor-text text-primary me-2"></i>Discrimination Test Observation Table
+      </h6>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-disc-row">
+        <i class="bi bi-plus-lg me-1"></i>Add Test Load Row
+      </button>
+    </div>
+    <form method="post" action="{% url 'measurements:discrimination_batch_save' session.pk %}" id="disc-batch-form">
+      {% csrf_token %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle table-hover mb-0" id="disc-entry-table">
+          <thead class="table-light">
+            <tr class="small text-uppercase text-secondary">
+              <th style="width: 160px;">Base Load ({{ instrument.unit_of_measure }}) *</th>
+              <th style="width: 160px;">Indication Before (\(I_1\)) *</th>
+              <th style="width: 170px;">Additional Mass (\(\Delta L \approx 1.4d\)) *</th>
+              <th style="width: 160px;">Indication After (\(I_2\)) *</th>
+              <th style="width: 120px;">Change (\(\Delta I\))</th>
+              <th style="width: 100px;">Temp (°C)</th>
+              <th>Remarks / Response Observations</th>
+              <th style="width: 50px;"></th>
+            </tr>
+          </thead>
+          <tbody id="disc-rows-body">
+            <!-- Row 1: Min -->
+            <tr class="disc-row">
+              <td>
+                <input type="number" step="any" min="0" name="disc_test_load[]" class="form-control form-control-sm font-monospace" placeholder="e.g. {{ instrument.min_capacity }}" value="{{ instrument.min_capacity }}" required>
+              </td>
+              <td>
+                <input type="number" step="any" name="disc_before[]" class="form-control form-control-sm font-monospace disc-before" placeholder="0.0000" required>
+              </td>
+              <td>
+                <input type="number" step="any" min="0" name="disc_delta[]" class="form-control form-control-sm font-monospace disc-delta" placeholder="0.0014" required>
+              </td>
+              <td>
+                <input type="number" step="any" name="disc_after[]" class="form-control form-control-sm font-monospace disc-after" placeholder="0.0000" required>
+              </td>
+              <td>
+                <span class="badge bg-light text-dark font-monospace disc-change-badge">—</span>
+              </td>
+              <td>
+                <input type="number" step="0.1" name="disc_temp[]" class="form-control form-control-sm" value="{{ session.environmental_temperature|default:'' }}" placeholder="20.0">
+              </td>
+              <td>
+                <input type="text" name="disc_obs[]" class="form-control form-control-sm" placeholder="e.g. Smooth step to next digit">
+              </td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-disc" title="Remove">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer bg-light d-flex justify-content-between align-items-center py-2 px-3">
+        <small class="text-muted">
+          <i class="bi bi-shield-check me-1"></i>System validates that \(\Delta I \ge 1d\) (scale interval: {{ instrument.scale_interval }} {{ instrument.unit_of_measure }}).
+        </small>
+        <div class="d-flex gap-2">
+          <button type="submit" name="action" value="draft" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-pencil-square me-1"></i>Save as Draft
+          </button>
+          <button type="submit" name="action" value="save" class="btn btn-primary btn-sm">
+            <i class="bi bi-check-circle me-1"></i>Save &amp; Evaluate Discrimination
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Previously Recorded Discrimination Observations -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-check2-all text-primary me-2"></i>Recorded Discrimination Observations &amp; Results
+      </h6>
+      <span class="badge bg-primary rounded-pill">{{ measurements.count }} Tests Logged</span>
+    </div>
+    <div class="card-body p-0">
+      {% if measurements %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr class="small text-uppercase text-secondary">
+              <th>#</th>
+              <th>Base Load</th>
+              <th>Indication Before (\(I_1\))</th>
+              <th>Added Mass (\(\Delta L\))</th>
+              <th>Indication After (\(I_2\))</th>
+              <th>Change (\(\Delta I\))</th>
+              <th>Criterion (\(\ge 1d\))</th>
+              <th>Result</th>
+              <th>Temp</th>
+              <th>Observations</th>
+              <th>Status</th>
+              {% if not session.is_locked %}<th class="text-end">Actions</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in measurements %}
+            <tr class="{% if m.pass_fail == 'PASS' %}table-success bg-opacity-25{% elif m.pass_fail == 'FAIL' %}table-danger bg-opacity-25{% endif %}">
+              <td class="text-muted small">{{ forloop.counter }}</td>
+              <td class="font-monospace fw-semibold">{{ m.test_load }} {{ instrument.unit_of_measure }}</td>
+              <td class="font-monospace text-muted small">{{ m.indication_before }}</td>
+              <td class="font-monospace text-primary">{{ m.small_weight_added }}</td>
+              <td class="font-monospace text-primary fw-semibold">{{ m.indication_after }}</td>
+              <td class="font-monospace fw-bold {% if m.pass_fail == 'FAIL' %}text-danger{% else %}text-dark{% endif %}">
+                {{ m.change|default:"—" }}
+              </td>
+              <td class="font-monospace small text-muted">&ge; {{ instrument.scale_interval }}</td>
+              <td>{% include "components/_pass_fail_badge.html" with result=m.pass_fail %}</td>
+              <td class="small text-muted">{{ m.temperature|default:"—" }}{% if m.temperature %}°C{% endif %}</td>
+              <td class="small text-muted">{{ m.observations|default:"—" }}</td>
+              <td>
+                {% if m.is_draft %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Draft</span>
+                {% else %}
+                <span class="badge bg-success bg-opacity-10 text-success"><i class="bi bi-check me-1"></i>Validated</span>
+                {% endif %}
+              </td>
+              {% if not session.is_locked %}
+              <td class="text-end">
+                <form method="post" action="{% url 'measurements:discrimination_delete' session.pk m.pk %}"
+                      class="d-inline" onsubmit="return confirm('Delete this discrimination record?');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-activity fs-1 d-block mb-2 text-secondary"></i>
+        <h6>No discrimination observations recorded yet.</h6>
+        <p class="small mb-0">Use the observation table above to record discrimination tests at Min, 0.5 Max, or Max.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Dynamic Discrimination Calculation Script -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const tableBody = document.getElementById("disc-rows-body");
+  const addBtn = document.getElementById("btn-add-disc-row");
+
+  function updateDiscRow(row) {
+    const beforeInput = row.querySelector(".disc-before");
+    const afterInput = row.querySelector(".disc-after");
+    const badge = row.querySelector(".disc-change-badge");
+    if (!beforeInput || !afterInput || !badge) return;
+
+    const b = parseFloat(beforeInput.value);
+    const a = parseFloat(afterInput.value);
+    if (!isNaN(b) && !isNaN(a)) {
+      const change = (a - b).toFixed(4);
+      badge.textContent = change;
+      badge.className = "badge font-monospace " + (change > 0 ? "bg-success" : "bg-warning text-dark");
+    } else {
+      badge.textContent = "—";
+      badge.className = "badge bg-light text-dark font-monospace";
+    }
+  }
+
+  function attachDiscEvents(row) {
+    const inputs = row.querySelectorAll(".disc-before, .disc-after");
+    inputs.forEach(input => input.addEventListener("input", () => updateDiscRow(row)));
+    const removeBtn = row.querySelector(".btn-remove-disc");
+    if (removeBtn) {
+      removeBtn.addEventListener("click", function () {
+        if (tableBody.querySelectorAll(".disc-row").length > 1) {
+          row.remove();
+        } else {
+          alert("At least one test load row must remain.");
+        }
+      });
+    }
+  }
+
+  if (tableBody) {
+    tableBody.querySelectorAll(".disc-row").forEach(attachDiscEvents);
+  }
+
+  if (addBtn && tableBody) {
+    addBtn.addEventListener("click", function () {
+      const templateRow = tableBody.querySelector(".disc-row");
+      if (!templateRow) return;
+      const newRow = templateRow.cloneNode(true);
+      newRow.querySelectorAll("input").forEach(input => {
+        if (!input.name.includes("temp")) input.value = "";
+      });
+      newRow.querySelector(".disc-change-badge").textContent = "—";
+      attachDiscEvents(newRow);
+      tableBody.appendChild(newRow);
+    });
+  }
+});
+</script>
+{% endblock %}

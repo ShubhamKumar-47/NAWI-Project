@@ -1,0 +1,389 @@
+{% extends "base/_base.html" %}
+{% block title %}Repeatability Test — {{ session.session_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+  <!-- Top Navigation & Action Header -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1 small">
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:list' %}">Test Sessions</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:detail' session.pk %}">{{ session.session_number }}</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Repeatability Test</li>
+        </ol>
+      </nav>
+      <h4 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-arrow-repeat text-primary me-2"></i>Repeatability Test
+        <span class="badge bg-secondary ms-2 fs-6">OIML R 76 §A.4.10</span>
+      </h4>
+    </div>
+    <div class="d-flex gap-2 align-items-center mt-2 mt-sm-0">
+      <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to Session
+      </a>
+      {% if not session.is_locked %}
+      <a href="{% url 'measurements:repeatability_add' session.pk %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-plus-circle me-1"></i>Single Repetition Form
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Instrument Metrological Banner -->
+  <div class="card border-0 shadow-sm mb-4 bg-light">
+    <div class="card-body py-2 px-3">
+      <div class="row g-2 align-items-center small">
+        <div class="col-md-3">
+          <span class="text-muted d-block">Instrument</span>
+          <strong class="text-dark">{{ instrument.display_name }} ({{ instrument.model_number }})</strong>
+        </div>
+        <div class="col-md-2">
+          <span class="text-muted d-block">Accuracy Class</span>
+          <span class="badge bg-primary text-uppercase">{{ instrument.get_accuracy_class_display }}</span>
+        </div>
+        <div class="col-md-3">
+          <span class="text-muted d-block">Capacity (Min / Max)</span>
+          <span class="font-monospace fw-semibold">{{ instrument.min_capacity }} {{ instrument.unit_of_measure }} — {{ instrument.max_capacity }} {{ instrument.unit_of_measure }}</span>
+        </div>
+        <div class="col-md-2">
+          <span class="text-muted d-block">Scale Interval</span>
+          <span class="font-monospace fw-semibold">e = {{ instrument.actual_scale_interval }} {{ instrument.unit_of_measure }}</span>
+        </div>
+        <div class="col-md-2 text-md-end">
+          <span class="text-muted d-block">Test Session Status</span>
+          {% include "components/_status_badge.html" with status=session.status %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standard Metrological Requirements Callout -->
+  <div class="alert alert-info border-0 shadow-sm d-flex gap-2 py-2 mb-4">
+    <i class="bi bi-info-circle-fill flex-shrink-0 mt-1 fs-5"></i>
+    <div class="small">
+      <strong>OIML R 76 §A.4.10 Repeatability Criterion:</strong> Successive weighings of the same test load (typically one series at ~0.5 Max and one at ~Max)
+      must have a maximum difference (range \(R = I_{max} - I_{min}\)) not exceeding the absolute maximum permissible error (\(|MPE|\)) for that load.
+      A minimum of 3 repetitions (typically 3 or 10 depending on instrument class) is required per series.
+    </div>
+  </div>
+
+  <!-- Dynamic Series Observation Entry Form -->
+  {% if not session.is_locked %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-input-cursor-text text-primary me-2"></i>Enter Repeatability Test Series
+      </h6>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-rep-row">
+        <i class="bi bi-plus-lg me-1"></i>Add Repetition Row
+      </button>
+    </div>
+    <form method="post" action="{% url 'measurements:repeatability_batch_save' session.pk %}" id="rep-batch-form">
+      {% csrf_token %}
+      <div class="card-body p-3 bg-light bg-opacity-25 border-bottom">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold small">Series Title *</label>
+            <input type="text" name="series_name" class="form-control form-control-sm" value="Series 1 (~0.5 Max)" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold small">Reference Load ({{ instrument.unit_of_measure }}) *</label>
+            <input type="number" step="any" min="0" name="nominal_load" id="rep-nominal-load" class="form-control form-control-sm font-monospace" placeholder="e.g. 50.0000" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold small">Temp (°C)</label>
+            <input type="number" step="0.1" name="temperature" class="form-control form-control-sm" value="{{ session.environmental_temperature|default:'' }}" placeholder="20.0">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold small">Remarks</label>
+            <input type="text" name="observations" class="form-control form-control-sm" placeholder="e.g. Smooth release on pan">
+          </div>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle table-hover mb-0" id="rep-entry-table">
+          <thead class="table-light">
+            <tr class="small text-uppercase text-secondary">
+              <th style="width: 80px;">Rep #</th>
+              <th style="width: 200px;">Indicated Reading ({{ instrument.unit_of_measure }}) *</th>
+              <th style="width: 150px;">Zero Indication</th>
+              <th style="width: 150px;">Individual Error</th>
+              <th>Status / Notes</th>
+              <th style="width: 50px;"></th>
+            </tr>
+          </thead>
+          <tbody id="rep-rows-body">
+            <!-- Rep 1 -->
+            <tr class="rep-row">
+              <td class="text-muted fw-bold rep-num">1</td>
+              <td>
+                <input type="number" step="any" name="rep_indication[]" class="form-control form-control-sm font-monospace rep-ind-input" placeholder="0.0000" required>
+              </td>
+              <td>
+                <input type="number" step="any" name="rep_zero_indication[]" class="form-control form-control-sm font-monospace" value="0.0000">
+              </td>
+              <td>
+                <span class="badge bg-light text-dark font-monospace rep-error-badge">—</span>
+              </td>
+              <td class="small text-muted">Successive loading #1</td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-rep" title="Remove">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            <!-- Rep 2 -->
+            <tr class="rep-row">
+              <td class="text-muted fw-bold rep-num">2</td>
+              <td>
+                <input type="number" step="any" name="rep_indication[]" class="form-control form-control-sm font-monospace rep-ind-input" placeholder="0.0000" required>
+              </td>
+              <td>
+                <input type="number" step="any" name="rep_zero_indication[]" class="form-control form-control-sm font-monospace" value="0.0000">
+              </td>
+              <td>
+                <span class="badge bg-light text-dark font-monospace rep-error-badge">—</span>
+              </td>
+              <td class="small text-muted">Successive loading #2</td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-rep" title="Remove">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            <!-- Rep 3 -->
+            <tr class="rep-row">
+              <td class="text-muted fw-bold rep-num">3</td>
+              <td>
+                <input type="number" step="any" name="rep_indication[]" class="form-control form-control-sm font-monospace rep-ind-input" placeholder="0.0000" required>
+              </td>
+              <td>
+                <input type="number" step="any" name="rep_zero_indication[]" class="form-control form-control-sm font-monospace" value="0.0000">
+              </td>
+              <td>
+                <span class="badge bg-light text-dark font-monospace rep-error-badge">—</span>
+              </td>
+              <td class="small text-muted">Successive loading #3</td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-rep" title="Remove">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Live Series Range Calculator Footer -->
+      <div class="card-footer bg-light py-3 px-3 d-flex flex-wrap justify-content-between align-items-center">
+        <div class="d-flex gap-3 align-items-center mb-2 mb-md-0 small">
+          <div>
+            <span class="text-muted d-block">Live Series Range (\(I_{max} - I_{min}\)):</span>
+            <strong class="font-monospace fs-6 text-dark" id="live-series-range">—</strong>
+          </div>
+          <div>
+            <span class="text-muted d-block">Number of Readings:</span>
+            <span class="badge bg-secondary" id="live-rep-count">3 Readings</span>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" name="action" value="draft" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-pencil-square me-1"></i>Save Series as Draft
+          </button>
+          <button type="submit" name="action" value="save" class="btn btn-primary btn-sm">
+            <i class="bi bi-check-circle me-1"></i>Save &amp; Evaluate Series
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Previously Recorded Repeatability Series & Summary Results -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-journal-check text-primary me-2"></i>Recorded Repeatability Series &amp; Compliance Range
+      </h6>
+      <span class="badge bg-primary rounded-pill">{{ measurements.count }} Repetitions Logged</span>
+    </div>
+    <div class="card-body p-0">
+      {% if series_dict %}
+        {% for s_name, s_data in series_dict.items %}
+        <div class="p-3 border-bottom bg-light bg-opacity-25 d-flex flex-wrap justify-content-between align-items-center">
+          <div>
+            <h6 class="mb-0 fw-bold text-primary">{{ s_name }}</h6>
+            <small class="text-muted">Nominal Load: <strong>{{ s_data.nominal_load }} {{ instrument.unit_of_measure }}</strong> | Repetitions: <strong>{{ s_data.items|length }}</strong></small>
+          </div>
+          <div class="d-flex gap-3 align-items-center">
+            <div class="text-end small">
+              <span class="text-muted d-block">Observed Range (\(R\)):</span>
+              <strong class="font-monospace text-dark">{{ s_data.range }} {{ instrument.unit_of_measure }}</strong>
+            </div>
+            <div class="text-end small">
+              <span class="text-muted d-block">Allowable MPE:</span>
+              <strong class="font-monospace text-muted">&plusmn;{{ s_data.mpe }}</strong>
+            </div>
+            <div>
+              {% include "components/_pass_fail_badge.html" with result=s_data.pass_fail %}
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive mb-3">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr class="small text-uppercase text-secondary">
+                <th style="width: 80px;">Rep #</th>
+                <th>Reference Load</th>
+                <th>Zero Indication</th>
+                <th>Displayed Reading</th>
+                <th>Error</th>
+                <th>MPE</th>
+                <th>Result</th>
+                <th>Temp</th>
+                <th>Observations</th>
+                <th>Draft</th>
+                {% if not session.is_locked %}<th class="text-end">Actions</th>{% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in s_data.items %}
+              <tr class="{% if item.pass_fail == 'PASS' %}table-success bg-opacity-25{% elif item.pass_fail == 'FAIL' %}table-danger bg-opacity-25{% endif %}">
+                <td class="text-muted small">Rep #{{ item.repetition_number }}</td>
+                <td class="font-monospace">{{ item.nominal_load }} {{ instrument.unit_of_measure }}</td>
+                <td class="font-monospace text-muted small">{{ item.zero_indication }}</td>
+                <td class="font-monospace text-primary fw-semibold">{{ item.indication }} {{ instrument.unit_of_measure }}</td>
+                <td class="font-monospace">{{ item.error|default:"—" }}</td>
+                <td class="font-monospace text-muted small">&plusmn;{{ item.mpe|default:"—" }}</td>
+                <td>{% include "components/_pass_fail_badge.html" with result=item.pass_fail %}</td>
+                <td class="small text-muted">{{ item.temperature|default:"—" }}{% if item.temperature %}°C{% endif %}</td>
+                <td class="small text-muted">{{ item.observations|default:"—" }}</td>
+                <td>
+                  {% if item.is_draft %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Draft</span>
+                  {% else %}
+                  <span class="badge bg-success bg-opacity-10 text-success"><i class="bi bi-check me-1"></i>Validated</span>
+                  {% endif %}
+                </td>
+                {% if not session.is_locked %}
+                <td class="text-end">
+                  <form method="post" action="{% url 'measurements:repeatability_delete' session.pk item.pk %}"
+                        class="d-inline" onsubmit="return confirm('Delete this repetition?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Delete Repetition">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </td>
+                {% endif %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-arrow-repeat fs-1 d-block mb-2 text-secondary"></i>
+        <h6>No repeatability series recorded yet.</h6>
+        <p class="small mb-0">Use the dynamic series table above to record successive readings for identical loads.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Dynamic Repeatability Calculations Script -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const tableBody = document.getElementById("rep-rows-body");
+  const addBtn = document.getElementById("btn-add-rep-row");
+  const nominalInput = document.getElementById("rep-nominal-load");
+  const rangeDisplay = document.getElementById("live-series-range");
+  const countDisplay = document.getElementById("live-rep-count");
+
+  function recalculateSeries() {
+    const rows = tableBody.querySelectorAll(".rep-row");
+    const nom = parseFloat(nominalInput ? nominalInput.value : NaN);
+    const indications = [];
+
+    rows.forEach((row, index) => {
+      const repNumCell = row.querySelector(".rep-num");
+      if (repNumCell) repNumCell.textContent = (index + 1);
+
+      const indInput = row.querySelector(".rep-ind-input");
+      const errBadge = row.querySelector(".rep-error-badge");
+      const val = parseFloat(indInput.value);
+
+      if (!isNaN(val)) {
+        indications.push(val);
+        if (!isNaN(nom)) {
+          const err = (val - nom).toFixed(4);
+          errBadge.textContent = err;
+          errBadge.className = "badge font-monospace " + (err == 0 ? "bg-success" : "bg-primary text-white");
+        } else {
+          errBadge.textContent = "—";
+        }
+      } else {
+        errBadge.textContent = "—";
+      }
+    });
+
+    if (countDisplay) {
+      countDisplay.textContent = indications.length + " Reading" + (indications.length === 1 ? "" : "s");
+    }
+
+    if (indications.length >= 2 && rangeDisplay) {
+      const maxVal = Math.max(...indications);
+      const minVal = Math.min(...indications);
+      const rangeVal = (maxVal - minVal).toFixed(4);
+      rangeDisplay.textContent = rangeVal + " (Max: " + maxVal + ", Min: " + minVal + ")";
+    } else if (rangeDisplay) {
+      rangeDisplay.textContent = "—";
+    }
+  }
+
+  function attachRepEvents(row) {
+    const indInput = row.querySelector(".rep-ind-input");
+    if (indInput) {
+      indInput.addEventListener("input", recalculateSeries);
+    }
+    const removeBtn = row.querySelector(".btn-remove-rep");
+    if (removeBtn) {
+      removeBtn.addEventListener("click", function () {
+        if (tableBody.querySelectorAll(".rep-row").length > 1) {
+          row.remove();
+          recalculateSeries();
+        } else {
+          alert("A repeatability series requires at least one reading.");
+        }
+      });
+    }
+  }
+
+  if (tableBody) {
+    tableBody.querySelectorAll(".rep-row").forEach(attachRepEvents);
+  }
+
+  if (nominalInput) {
+    nominalInput.addEventListener("input", recalculateSeries);
+  }
+
+  if (addBtn && tableBody) {
+    addBtn.addEventListener("click", function () {
+      const currentRows = tableBody.querySelectorAll(".rep-row");
+      const templateRow = currentRows[0];
+      if (!templateRow) return;
+      const newRow = templateRow.cloneNode(true);
+      newRow.querySelector(".rep-ind-input").value = "";
+      newRow.querySelector(".rep-error-badge").textContent = "—";
+      attachRepEvents(newRow);
+      tableBody.appendChild(newRow);
+      recalculateSeries();
+    });
+  }
+});
+</script>
+{% endblock %}

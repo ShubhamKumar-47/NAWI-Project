@@ -1,0 +1,224 @@
+{% extends "base/_base.html" %}
+{% block title %}Laboratory & System Settings — NAWI TRMS{% endblock %}
+
+{% block breadcrumb %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"Administration"},{"label":"Laboratory Settings"}]'|safe %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom">
+  <div>
+    <h3 class="mb-0 fw-bold text-dark">
+      <i class="bi bi-gear-wide-connected text-primary me-2"></i>Laboratory &amp; System Settings
+    </h3>
+    <p class="text-muted small mb-0 mt-1">
+      Configure laboratory metadata, default OIML R 76 testing baselines, certificate formatting, and display preferences.
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'dashboard:home' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Return to Dashboard
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left Column: Navigation Tabs -->
+  <div class="col-lg-3">
+    <div class="card border-0 shadow-sm p-2 sticky-top" style="top: 80px;">
+      <div class="nav flex-column nav-pills" id="settings-tabs" role="tablist">
+        <button class="nav-link active text-start py-2 px-3 fw-semibold mb-1" id="tab-general-btn" data-bs-toggle="pill" data-bs-target="#tab-general" type="button" role="tab">
+          <i class="bi bi-building me-2"></i>Laboratory Profile
+        </button>
+        <button class="nav-link text-start py-2 px-3 fw-semibold mb-1" id="tab-metrology-btn" data-bs-toggle="pill" data-bs-target="#tab-metrology" type="button" role="tab">
+          <i class="bi bi-speedometer2 me-2"></i>OIML Baselines
+        </button>
+        <button class="nav-link text-start py-2 px-3 fw-semibold mb-1" id="tab-reports-btn" data-bs-toggle="pill" data-bs-target="#tab-reports" type="button" role="tab">
+          <i class="bi bi-file-earmark-check me-2"></i>Report Certificates
+        </button>
+        <button class="nav-link text-start py-2 px-3 fw-semibold mb-1" id="tab-interface-btn" data-bs-toggle="pill" data-bs-target="#tab-interface" type="button" role="tab">
+          <i class="bi bi-sliders me-2"></i>Display Preferences
+        </button>
+      </div>
+
+      <hr class="my-2">
+      <div class="p-2 small text-muted">
+        <i class="bi bi-shield-check text-success me-1"></i>ISO/IEC 17025 Accredited Management Module
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Settings Tab Panes -->
+  <div class="col-lg-9">
+    <form method="post" id="settings-form">
+      {% csrf_token %}
+
+      <div class="tab-content" id="settings-content">
+        <!-- ── 1. Laboratory Profile ────────────────────────────────────── -->
+        <div class="tab-pane fade show active" id="tab-general" role="tabpanel">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+              <h5 class="mb-0 fw-bold text-dark">
+                <i class="bi bi-building text-primary me-2"></i>Laboratory Identification &amp; Accreditation
+              </h5>
+              <span class="badge bg-light text-dark border">Legal Metrology</span>
+            </div>
+            <div class="card-body p-4">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Testing Laboratory Name <span class="text-danger">*</span></label>
+                  <input type="text" name="lab_name" class="form-control" value="{{ org.name|default:'National Metrology Testing Center' }}" required>
+                  <div class="form-text">Appears on official test reports and certificates.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Accreditation Identifier / Certificate #</label>
+                  <input type="text" name="accreditation_no" class="form-control" value="{{ org.accreditation_number|default:'ISO-17025-LAB-0428' }}">
+                  <div class="form-text">ILAC / National Accreditation Body reference code.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Primary Calibration Facility Location</label>
+                  <input type="text" name="lab_location" class="form-control" value="Metrology Building 4, Central Testing Complex">
+                  <div class="form-text">Laboratory room or environmental test chamber.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Responsible Metrologist / Technical Signatory</label>
+                  <input type="text" name="tech_director" class="form-control" value="{{ user.full_name }} ({{ user.get_role_display }})">
+                  <div class="form-text">Authorized approval officer signature label.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 2. OIML Metrology Baselines ─────────────────────────────── -->
+        <div class="tab-pane fade" id="tab-metrology" role="tabpanel">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+              <h5 class="mb-0 fw-bold text-dark">
+                <i class="bi bi-speedometer2 text-primary me-2"></i>Metrological &amp; Calculation Defaults
+              </h5>
+              <span class="badge bg-primary">OIML R 76-1</span>
+            </div>
+            <div class="card-body p-4">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Governing OIML Standard Edition</label>
+                  <select name="default_oiml" class="form-select">
+                    <option value="R76_2006" {% if default_oiml == 'R76_2006' %}selected{% endif %}>OIML R 76-1:2006 (Standard)</option>
+                    <option value="R76_1992" {% if default_oiml == 'R76_1992' %}selected{% endif %}>OIML R 76-1:1992 (Legacy)</option>
+                  </select>
+                  <div class="form-text">Determines verification scale interval zones and MPE limits.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Standard Gravity of Reference ($g$)</label>
+                  <div class="input-group">
+                    <input type="text" name="gravity_constant" class="form-control font-monospace" value="9.80665" readonly>
+                    <span class="input-group-text bg-light">m/s²</span>
+                  </div>
+                  <div class="form-text">Conventional international standard reference gravity.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Reference Ambient Temperature Baseline</label>
+                  <div class="input-group">
+                    <input type="number" step="0.1" name="temp_baseline" class="form-control font-monospace" value="{{ temp_baseline }}">
+                    <span class="input-group-text bg-light">°C</span>
+                  </div>
+                  <div class="form-text">Standard laboratory nominal temperature (typically 20.0 °C).</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Reference Relative Humidity Baseline</label>
+                  <div class="input-group">
+                    <input type="number" step="1" name="humidity_baseline" class="form-control font-monospace" value="{{ humidity_baseline }}">
+                    <span class="input-group-text bg-light">% RH</span>
+                  </div>
+                  <div class="form-text">Standard laboratory nominal relative humidity (typically 50%).</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 3. Report Certificate Formatting ────────────────────────── -->
+        <div class="tab-pane fade" id="tab-reports" role="tabpanel">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+              <h5 class="mb-0 fw-bold text-dark">
+                <i class="bi bi-file-earmark-check text-primary me-2"></i>Report &amp; Certificate Issuance Rules
+              </h5>
+              <span class="badge bg-secondary">ISO 17025 Compliant</span>
+            </div>
+            <div class="card-body p-4">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Official Certificate Number Prefix</label>
+                  <input type="text" name="report_prefix" class="form-control font-monospace" value="TR-">
+                  <div class="form-text">E.g., <code>TR-TS-2026-0001-R01</code>.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Default Report Delivery Format</label>
+                  <select name="default_report_format" class="form-select">
+                    <option value="BOTH" selected>Synchronized PDF Certificate &amp; Editable Word (.docx)</option>
+                    <option value="PDF">PDF Certificate Only (ReportLab)</option>
+                    <option value="DOCX">Microsoft Word Document (.docx)</option>
+                  </select>
+                  <div class="form-text">Preferred dual-output format on one-click generation.</div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold">Mandatory Calibration Traceability Disclaimer</label>
+                  <textarea class="form-control small" rows="3" readonly>The measurement results reported in this certificate relate only to the instrument identified herein. All reference test loads are traceable to national measurement standards maintained by the National Metrology Institute (NMI) through an unbroken chain of calibrations conforming to ISO/IEC 17025.</textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 4. Display Preferences ─────────────────────────────────── -->
+        <div class="tab-pane fade" id="tab-interface" role="tabpanel">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+              <h5 class="mb-0 fw-bold text-dark">
+                <i class="bi bi-sliders text-primary me-2"></i>User Interface &amp; Table Density
+              </h5>
+              <span class="badge bg-light text-dark border">Preferences</span>
+            </div>
+            <div class="card-body p-4">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div class="form-check form-switch p-3 border rounded bg-light">
+                    <input class="form-check-input" type="checkbox" id="compact_tables" name="compact_tables" {% if compact_tables %}checked{% endif %}>
+                    <label class="form-check-label fw-bold text-dark d-block" for="compact_tables">
+                      Compact Table Density
+                    </label>
+                    <small class="text-muted">Reduces table row padding to fit more metrological observation rows on small screens.</small>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-check form-switch p-3 border rounded bg-light">
+                    <input class="form-check-input" type="checkbox" id="auto_refresh" name="auto_refresh" checked>
+                    <label class="form-check-label fw-bold text-dark d-block" for="auto_refresh">
+                      Active Status Indicators
+                    </label>
+                    <small class="text-muted">Displays real-time pass/fail pills and progress badges across all consoles.</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Button Row -->
+      <div class="d-flex justify-content-end gap-2 pb-5">
+        <a href="{% url 'dashboard:home' %}" class="btn btn-outline-secondary">
+          Cancel
+        </a>
+        <button type="submit" class="btn btn-primary px-4 shadow-sm" data-loading-text="Saving Settings...">
+          <i class="bi bi-check-lg me-1"></i>Save Laboratory Settings
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,83 @@
+{% extends "base/_base.html" %}
+{% block title %}Organisations — Laboratory Multi-Tenancy{% endblock %}
+
+{% block breadcrumb %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"Administration"},{"label":"Organisations"}]'|safe %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom">
+  <div>
+    <h3 class="mb-0 fw-bold text-dark">
+      <i class="bi bi-building text-primary me-2"></i>Laboratory Organisations &amp; Multi-Tenancy
+    </h3>
+    <p class="text-muted small mb-0 mt-1">
+      Manage accredited calibration laboratories, test centers, and multi-tenant organizational boundaries.
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'accounts:org_create' %}" class="btn btn-primary shadow-sm">
+      <i class="bi bi-plus-lg me-1"></i>Add Organisation
+    </a>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm bg-white">
+  <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h6 class="mb-0 fw-bold text-dark">
+      <i class="bi bi-buildings text-secondary me-2"></i>Registered Testing Laboratories
+    </h6>
+    <input type="text" class="form-control form-control-sm" style="max-width: 220px;" placeholder="Search organisations..." data-table-search="#orgs-table">
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="orgs-table">
+        <thead class="table-light small text-uppercase text-secondary">
+          <tr>
+            <th class="ps-3" style="width: 32%;">Organisation Name</th>
+            <th style="width: 24%;">Accreditation Certificate #</th>
+            <th style="width: 24%;">Contact Email</th>
+            <th style="width: 10%;">Status</th>
+            <th style="width: 10%;" class="text-end pe-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for org in organizations %}
+          <tr>
+            <td class="ps-3">
+              <span class="fw-bold text-dark">{{ org.name }}</span>
+            </td>
+            <td>
+              <span class="font-monospace small text-primary">{{ org.accreditation_number|default:"—" }}</span>
+            </td>
+            <td>
+              <span class="text-muted small">{{ org.email|default:"—" }}</span>
+            </td>
+            <td>
+              {% if org.is_active %}
+              <span class="badge badge-soft-success"><i class="bi bi-check-circle-fill me-1"></i>Active</span>
+              {% else %}
+              <span class="badge badge-soft-danger"><i class="bi bi-x-circle-fill me-1"></i>Inactive</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-3">
+              <a href="{% url 'accounts:org_edit' org.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit Organisation">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-center text-muted py-5">
+              <i class="bi bi-building fs-1 d-block mb-3 text-secondary"></i>
+              <h6 class="fw-bold">No Organisations Found</h6>
+              <p class="small text-muted mb-0">No multi-tenant organisations registered yet.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

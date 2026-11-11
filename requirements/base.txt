@@ -1,0 +1,13 @@
+Django>=5.0,<6.0
+django-environ>=0.11
+django-crispy-forms>=2.0
+crispy-bootstrap5>=2024.2
+Pillow>=10.0
+reportlab>=4.0
+python-docx>=1.1
+celery>=5.3
+redis>=5.0
+django-axes>=6.0
+factory-boy>=3.3
+matplotlib>=3.8
+openpyxl>=3.1

@@ -1,0 +1,284 @@
+{% extends "base/_base.html" %}
+{% block title %}Tare Weighing Test — {{ session.session_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+  <!-- Top Navigation & Action Header -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1 small">
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:list' %}">Test Sessions</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:detail' session.pk %}">{{ session.session_number }}</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Tare Weighing Test</li>
+        </ol>
+      </nav>
+      <h4 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-box-seam text-primary me-2"></i>Tare Weighing Test
+        <span class="badge bg-secondary ms-2 fs-6">OIML R 76 §A.4.6</span>
+      </h4>
+    </div>
+    <div class="d-flex gap-2 align-items-center mt-2 mt-sm-0">
+      <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to Session
+      </a>
+      {% if not session.is_locked %}
+      <a href="{% url 'measurements:tare_add' session.pk %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-plus-circle me-1"></i>Single Tare Form
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Instrument Metrological Banner -->
+  <div class="card border-0 shadow-sm mb-4 bg-light">
+    <div class="card-body py-2 px-3">
+      <div class="row g-2 align-items-center small">
+        <div class="col-md-3">
+          <span class="text-muted d-block">Instrument</span>
+          <strong class="text-dark">{{ instrument.display_name }} ({{ instrument.model_number }})</strong>
+        </div>
+        <div class="col-md-2">
+          <span class="text-muted d-block">Accuracy Class</span>
+          <span class="badge bg-primary text-uppercase">{{ instrument.get_accuracy_class_display }}</span>
+        </div>
+        <div class="col-md-3">
+          <span class="text-muted d-block">Capacity (Min / Max)</span>
+          <span class="font-monospace fw-semibold">{{ instrument.min_capacity }} {{ instrument.unit_of_measure }} — {{ instrument.max_capacity }} {{ instrument.unit_of_measure }}</span>
+        </div>
+        <div class="col-md-2">
+          <span class="text-muted d-block">Scale Interval</span>
+          <span class="font-monospace fw-semibold">e = {{ instrument.actual_scale_interval }} {{ instrument.unit_of_measure }}</span>
+        </div>
+        <div class="col-md-2 text-md-end">
+          <span class="text-muted d-block">Test Session Status</span>
+          {% include "components/_status_badge.html" with status=session.status %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standard Metrological Requirements Callout -->
+  <div class="alert alert-info border-0 shadow-sm d-flex gap-2 py-2 mb-4">
+    <i class="bi bi-info-circle-fill flex-shrink-0 mt-1 fs-5"></i>
+    <div class="small">
+      <strong>OIML R 76 §A.4.6 Tare Weighing Requirements:</strong> Tare balancing and tare weighing operations are tested across applicable tare values.
+      The net error \(E_{net} = I_{net} - (I_{gross} - L_{tare})\) is evaluated against the MPE appropriate for the net indication.
+    </div>
+  </div>
+
+  <!-- Dynamic Batch Observation Entry Form -->
+  {% if not session.is_locked %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-input-cursor-text text-primary me-2"></i>Tare Weighing Observation Table
+      </h6>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-tare-row">
+        <i class="bi bi-plus-lg me-1"></i>Add Tare Test Row
+      </button>
+    </div>
+    <form method="post" action="{% url 'measurements:tare_batch_save' session.pk %}" id="tare-batch-form">
+      {% csrf_token %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle table-hover mb-0" id="tare-entry-table">
+          <thead class="table-light">
+            <tr class="small text-uppercase text-secondary">
+              <th style="width: 160px;">Applied Tare ({{ instrument.unit_of_measure }}) *</th>
+              <th style="width: 150px;">Net Test Load ({{ instrument.unit_of_measure }})</th>
+              <th style="width: 160px;">Gross Indication *</th>
+              <th style="width: 160px;">Net Indication *</th>
+              <th style="width: 120px;">Net Error</th>
+              <th style="width: 100px;">Temp (°C)</th>
+              <th>Remarks</th>
+              <th style="width: 50px;"></th>
+            </tr>
+          </thead>
+          <tbody id="tare-rows-body">
+            <tr class="tare-row">
+              <td>
+                <input type="number" step="any" min="0" name="tare_load[]" class="form-control form-control-sm font-monospace tare-applied" placeholder="0.0000" required>
+              </td>
+              <td>
+                <input type="number" step="any" min="0" name="tare_net_load[]" class="form-control form-control-sm font-monospace" placeholder="0.0000">
+              </td>
+              <td>
+                <input type="number" step="any" name="tare_gross[]" class="form-control form-control-sm font-monospace tare-gross" placeholder="0.0000" required>
+              </td>
+              <td>
+                <input type="number" step="any" name="tare_net[]" class="form-control form-control-sm font-monospace tare-net" placeholder="0.0000" required>
+              </td>
+              <td>
+                <span class="badge bg-light text-dark font-monospace tare-error-badge">—</span>
+              </td>
+              <td>
+                <input type="number" step="0.1" name="tare_temp[]" class="form-control form-control-sm" value="{{ session.environmental_temperature|default:'' }}" placeholder="20.0">
+              </td>
+              <td>
+                <input type="text" name="tare_obs[]" class="form-control form-control-sm" placeholder="e.g. Preset tare check">
+              </td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-tare" title="Remove">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer bg-light d-flex justify-content-between align-items-center py-2 px-3">
+        <small class="text-muted">
+          <i class="bi bi-shield-check me-1"></i>Net errors are evaluated against OIML R 76 MPE for net values.
+        </small>
+        <div class="d-flex gap-2">
+          <button type="submit" name="action" value="draft" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-pencil-square me-1"></i>Save as Draft
+          </button>
+          <button type="submit" name="action" value="save" class="btn btn-primary btn-sm">
+            <i class="bi bi-check-circle me-1"></i>Save &amp; Evaluate Tare Tests
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Previously Recorded Tare Observations -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-check2-square text-primary me-2"></i>Recorded Tare Observations &amp; Results
+      </h6>
+      <span class="badge bg-primary rounded-pill">{{ measurements.count }} Tare Tests Logged</span>
+    </div>
+    <div class="card-body p-0">
+      {% if measurements %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr class="small text-uppercase text-secondary">
+              <th>#</th>
+              <th>Tare Load</th>
+              <th>Net Test Load</th>
+              <th>Gross Indication</th>
+              <th>Net Indication</th>
+              <th>Net Error</th>
+              <th>MPE</th>
+              <th>Result</th>
+              <th>Temp</th>
+              <th>Remarks</th>
+              <th>Status</th>
+              {% if not session.is_locked %}<th class="text-end">Actions</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in measurements %}
+            <tr class="{% if m.pass_fail == 'PASS' %}table-success bg-opacity-25{% elif m.pass_fail == 'FAIL' %}table-danger bg-opacity-25{% endif %}">
+              <td class="text-muted small">{{ forloop.counter }}</td>
+              <td class="font-monospace fw-semibold">{{ m.tare_load }} {{ instrument.unit_of_measure }}</td>
+              <td class="font-monospace text-muted small">{{ m.net_load }} {{ instrument.unit_of_measure }}</td>
+              <td class="font-monospace text-muted small">{{ m.gross_indication }}</td>
+              <td class="font-monospace text-primary fw-semibold">{{ m.net_indication }}</td>
+              <td class="font-monospace fw-bold {% if m.pass_fail == 'FAIL' %}text-danger{% else %}text-dark{% endif %}">
+                {{ m.error|default:"—" }}
+              </td>
+              <td class="font-monospace text-muted small">&plusmn;{{ m.mpe|default:"—" }}</td>
+              <td>{% include "components/_pass_fail_badge.html" with result=m.pass_fail %}</td>
+              <td class="small text-muted">{{ m.temperature|default:"—" }}{% if m.temperature %}°C{% endif %}</td>
+              <td class="small text-muted">{{ m.observations|default:"—" }}</td>
+              <td>
+                {% if m.is_draft %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Draft</span>
+                {% else %}
+                <span class="badge bg-success bg-opacity-10 text-success"><i class="bi bi-check me-1"></i>Validated</span>
+                {% endif %}
+              </td>
+              {% if not session.is_locked %}
+              <td class="text-end">
+                <form method="post" action="{% url 'measurements:tare_delete' session.pk m.pk %}"
+                      class="d-inline" onsubmit="return confirm('Delete this tare record?');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-box-seam fs-1 d-block mb-2 text-secondary"></i>
+        <h6>No tare observations recorded yet.</h6>
+        <p class="small mb-0">Use the observation table above to record tare weighing performance.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Dynamic Tare Calculation Script -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const tableBody = document.getElementById("tare-rows-body");
+  const addBtn = document.getElementById("btn-add-tare-row");
+
+  function updateTareRow(row) {
+    const tareInput = row.querySelector(".tare-applied");
+    const grossInput = row.querySelector(".tare-gross");
+    const netInput = row.querySelector(".tare-net");
+    const badge = row.querySelector(".tare-error-badge");
+    if (!tareInput || !grossInput || !netInput || !badge) return;
+
+    const t = parseFloat(tareInput.value);
+    const g = parseFloat(grossInput.value);
+    const n = parseFloat(netInput.value);
+    if (!isNaN(t) && !isNaN(g) && !isNaN(n)) {
+      const effectiveNet = g - t;
+      const err = (n - effectiveNet).toFixed(4);
+      badge.textContent = err;
+      badge.className = "badge font-monospace " + (err == 0 ? "bg-success" : "bg-primary text-white");
+    } else {
+      badge.textContent = "—";
+      badge.className = "badge bg-light text-dark font-monospace";
+    }
+  }
+
+  function attachTareEvents(row) {
+    const inputs = row.querySelectorAll(".tare-applied, .tare-gross, .tare-net");
+    inputs.forEach(input => input.addEventListener("input", () => updateTareRow(row)));
+    const removeBtn = row.querySelector(".btn-remove-tare");
+    if (removeBtn) {
+      removeBtn.addEventListener("click", function () {
+        if (tableBody.querySelectorAll(".tare-row").length > 1) {
+          row.remove();
+        } else {
+          alert("At least one tare test row must remain.");
+        }
+      });
+    }
+  }
+
+  if (tableBody) {
+    tableBody.querySelectorAll(".tare-row").forEach(attachTareEvents);
+  }
+
+  if (addBtn && tableBody) {
+    addBtn.addEventListener("click", function () {
+      const templateRow = tableBody.querySelector(".tare-row");
+      if (!templateRow) return;
+      const newRow = templateRow.cloneNode(true);
+      newRow.querySelectorAll("input").forEach(input => {
+        if (!input.name.includes("temp")) input.value = "";
+      });
+      newRow.querySelector(".tare-error-badge").textContent = "—";
+      attachTareEvents(newRow);
+      tableBody.appendChild(newRow);
+    });
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends "base/_base.html" %}
+{% block title %}Confirm Delete Instrument — {{ instrument.display_name }}{% endblock %}
+
+{% block breadcrumb %}
+{% include "components/_breadcrumb.html" with breadcrumbs='[{"label":"Instruments","url":"/instruments/"},{"label":"Delete Confirmation"}]'|safe %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+
+    <div class="card shadow-sm border-0 mt-3">
+      <div class="card-header bg-danger bg-opacity-10 py-3 border-danger border-opacity-25">
+        <h5 class="mb-0 text-danger fw-bold">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Instrument Deletion
+        </h5>
+      </div>
+
+      <div class="card-body p-4">
+        {% if has_approved_sessions %}
+        <!-- Blocked Deletion Notice -->
+        <div class="alert alert-danger d-flex align-items-start gap-3 mb-4">
+          <i class="bi bi-shield-x fs-3 text-danger flex-shrink-0 mt-1"></i>
+          <div>
+            <h6 class="fw-bold mb-1">Deletion Blocked: Metrological Compliance</h6>
+            <p class="small mb-0">
+              This instrument has <strong>certified approved test records</strong> in the system.
+              In accordance with ISO/IEC 17025 and OIML R 76 traceability requirements, instruments with approved legal certificates cannot be deleted.
+            </p>
+          </div>
+        </div>
+
+        <div class="p-3 bg-light rounded mb-4">
+          <h6 class="fw-bold text-dark mb-2">Instrument Details:</h6>
+          <p class="mb-1"><strong>Name:</strong> {{ instrument.display_name }}</p>
+          <p class="mb-1 font-monospace"><strong>Serial Number:</strong> {{ instrument.serial_number }}</p>
+          <p class="mb-0"><strong>Manufacturer:</strong> {{ instrument.manufacturer }}</p>
+        </div>
+
+        <div class="d-flex justify-content-end">
+          <a href="{% url 'instruments:detail' instrument.pk %}" class="btn btn-primary">
+            <i class="bi bi-arrow-left me-1"></i>Return to Instrument Details
+          </a>
+        </div>
+
+        {% else %}
+        <!-- Deletion Confirmation -->
+        <p class="text-dark mb-3">
+          Are you sure you want to remove the following weighing instrument from active laboratory operations?
+        </p>
+
+        <div class="p-3 bg-light rounded mb-4 border">
+          <h6 class="fw-bold text-dark mb-2">{{ instrument.display_name }}</h6>
+          <dl class="row mb-0 small">
+            <dt class="col-sm-4 text-muted">Serial Number:</dt>
+            <dd class="col-sm-8 font-monospace fw-bold">{{ instrument.serial_number }}</dd>
+
+            <dt class="col-sm-4 text-muted">Manufacturer:</dt>
+            <dd class="col-sm-8">{{ instrument.manufacturer }}</dd>
+
+            <dt class="col-sm-4 text-muted">Accuracy Class:</dt>
+            <dd class="col-sm-8">Class {{ instrument.accuracy_class }}</dd>
+
+            <dt class="col-sm-4 text-muted">Max Capacity:</dt>
+            <dd class="col-sm-8 font-monospace">{{ instrument.max_capacity }} {{ instrument.unit_of_measurement }}</dd>
+
+            <dt class="col-sm-4 text-muted">Associated Tests:</dt>
+            <dd class="col-sm-8">
+              {% if total_sessions > 0 %}
+              <span class="badge bg-warning text-dark">{{ total_sessions }} draft/in-progress test session{{ total_sessions|pluralize }}</span>
+              {% else %}
+              <span class="text-muted">None</span>
+              {% endif %}
+            </dd>
+          </dl>
+        </div>
+
+        {% if total_sessions > 0 %}
+        <div class="alert alert-warning small d-flex gap-2 align-items-center mb-4">
+          <i class="bi bi-exclamation-circle text-warning fs-5"></i>
+          <div>
+            <strong>Notice:</strong> This instrument will be archived via soft-delete. Its {{ total_sessions }} draft session{{ total_sessions|pluralize }} will be preserved in audit history.
+          </div>
+        </div>
+        {% endif %}
+
+        <form method="post">
+          {% csrf_token %}
+          <div class="d-flex justify-content-between align-items-center">
+            <a href="{% url 'instruments:detail' instrument.pk %}" class="btn btn-outline-secondary">
+              <i class="bi bi-x-lg me-1"></i>Cancel
+            </a>
+            <button type="submit" class="btn btn-danger px-4">
+              <i class="bi bi-trash me-1"></i>Yes, Delete Instrument
+            </button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,297 @@
+{% extends "base/_base.html" %}
+{% block title %}Zero-Setting & Tracking Tests — {{ session.session_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+  <!-- Top Navigation & Action Header -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1 small">
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:list' %}">Test Sessions</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'test_sessions:detail' session.pk %}">{{ session.session_number }}</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Zero-Setting &amp; Zero-Tracking Tests</li>
+        </ol>
+      </nav>
+      <h4 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-bullseye text-primary me-2"></i>Zero-Setting &amp; Zero-Tracking Tests
+        <span class="badge bg-secondary ms-2 fs-6">OIML R 76 §A.4.1 – §A.4.3</span>
+      </h4>
+    </div>
+    <div class="d-flex gap-2 align-items-center mt-2 mt-sm-0">
+      <a href="{% url 'test_sessions:detail' session.pk %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to Session
+      </a>
+      {% if not session.is_locked %}
+      <a href="{% url 'measurements:zero_setting_add' session.pk %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-plus-circle me-1"></i>Single Zero Form
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Instrument Metrological Banner -->
+  <div class="card border-0 shadow-sm mb-4 bg-light">
+    <div class="card-body py-2 px-3">
+      <div class="row g-2 align-items-center small">
+        <div class="col-md-3">
+          <span class="text-muted d-block">Instrument</span>
+          <strong class="text-dark">{{ instrument.display_name }} ({{ instrument.model_number }})</strong>
+        </div>
+        <div class="col-md-2">
+          <span class="text-muted d-block">Scale Interval (d)</span>
+          <span class="font-monospace fw-semibold">d = {{ instrument.scale_interval }} {{ instrument.unit_of_measure }}</span>
+        </div>
+        <div class="col-md-3">
+          <span class="text-muted d-block">Verification Interval (e)</span>
+          <span class="font-monospace fw-semibold">e = {{ instrument.actual_scale_interval }} {{ instrument.unit_of_measure }}</span>
+        </div>
+        <div class="col-md-2">
+          <span class="text-muted d-block">Allowable Zero MPE (±0.25e)</span>
+          <span class="badge bg-success font-monospace">±{% widthratio instrument.actual_scale_interval 1 0.25 as z_mpe %}{{ instrument.actual_scale_interval|floatformat:4 }} &times; 0.25</span>
+        </div>
+        <div class="col-md-2 text-md-end">
+          <span class="text-muted d-block">Overall Zero Check</span>
+          {% if session.zero_test_passed %}
+          <span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Pass (±0.25e)</span>
+          {% else %}
+          <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>Pending / Review</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standard Metrological Requirements Callout -->
+  <div class="alert alert-info border-0 shadow-sm d-flex gap-2 py-2 mb-4">
+    <i class="bi bi-info-circle-fill flex-shrink-0 mt-1 fs-5"></i>
+    <div class="small">
+      <strong>OIML R 76 §A.4.1 Zero-Setting Tolerance:</strong> The error of zero-setting \(E_0 = I + 0.5d - \Delta L\) shall not exceed
+      \(\pm 0.25e\) (or \(\pm 0.5d\) for instruments with auxiliary indicating devices).
+      Small weights (\(\Delta L\), e.g. steps of \(0.1d\)) are placed until the indication changes to \(0 + d\).
+    </div>
+  </div>
+
+  <!-- Dynamic Batch Observation Entry Form -->
+  {% if not session.is_locked %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-input-cursor-text text-primary me-2"></i>Zero-Setting &amp; Zero-Tracking Observation Table
+      </h6>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-zero-row">
+        <i class="bi bi-plus-lg me-1"></i>Add Zero Check Row
+      </button>
+    </div>
+    <form method="post" action="{% url 'measurements:zero_setting_batch_save' session.pk %}" id="zero-batch-form">
+      {% csrf_token %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle table-hover mb-0" id="zero-entry-table">
+          <thead class="table-light">
+            <tr class="small text-uppercase text-secondary">
+              <th style="width: 220px;">Operation Type *</th>
+              <th style="width: 150px;">Indication Before *</th>
+              <th style="width: 150px;">Indication After *</th>
+              <th style="width: 170px;">Added Weights (\(\Delta L\))</th>
+              <th style="width: 130px;">Zero Error (\(E_0\))</th>
+              <th style="width: 100px;">Temp (°C)</th>
+              <th>Observations / Procedure Notes</th>
+              <th style="width: 50px;"></th>
+            </tr>
+          </thead>
+          <tbody id="zero-rows-body">
+            <tr class="zero-row">
+              <td>
+                <select name="zero_op[]" class="form-select form-select-sm">
+                  {% for op_val, op_lbl in operation_choices %}
+                  <option value="{{ op_val }}">{{ op_lbl }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <input type="number" step="any" name="zero_before[]" class="form-control form-control-sm font-monospace" value="0.0000" required>
+              </td>
+              <td>
+                <input type="number" step="any" name="zero_after[]" class="form-control form-control-sm font-monospace zero-after" value="0.0000" required>
+              </td>
+              <td>
+                <input type="number" step="any" min="0" name="zero_delta[]" class="form-control form-control-sm font-monospace zero-delta" value="0.0000" placeholder="0.0000">
+              </td>
+              <td>
+                <span class="badge bg-light text-dark font-monospace zero-error-badge">—</span>
+              </td>
+              <td>
+                <input type="number" step="0.1" name="zero_temp[]" class="form-control form-control-sm" value="{{ session.environmental_temperature|default:'' }}" placeholder="20.0">
+              </td>
+              <td>
+                <input type="text" name="zero_obs[]" class="form-control form-control-sm" placeholder="e.g. Zero pushbutton pressed">
+              </td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-zero" title="Remove">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer bg-light d-flex justify-content-between align-items-center py-2 px-3">
+        <small class="text-muted">
+          <i class="bi bi-shield-check me-1"></i>Acceptance tolerance is \(\pm 0.25e\) (\(e = {{ instrument.actual_scale_interval }} {{ instrument.unit_of_measure }}\)).
+        </small>
+        <div class="d-flex gap-2">
+          <button type="submit" name="action" value="draft" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-pencil-square me-1"></i>Save as Draft
+          </button>
+          <button type="submit" name="action" value="save" class="btn btn-primary btn-sm">
+            <i class="bi bi-check-circle me-1"></i>Save &amp; Evaluate Zero Checks
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Previously Recorded Zero-Setting Observations -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-check-circle text-primary me-2"></i>Recorded Zero-Setting Observations &amp; Tolerances
+      </h6>
+      <span class="badge bg-primary rounded-pill">{{ measurements.count }} Checks Logged</span>
+    </div>
+    <div class="card-body p-0">
+      {% if measurements %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr class="small text-uppercase text-secondary">
+              <th>Operation Type</th>
+              <th>Indication Before</th>
+              <th>Indication After</th>
+              <th>Added Mass (\(\Delta L\))</th>
+              <th>Zero Error (\(E_0\))</th>
+              <th>MPE (\(\pm 0.25e\))</th>
+              <th>Result</th>
+              <th>Temp</th>
+              <th>Remarks</th>
+              <th>Status</th>
+              {% if not session.is_locked %}<th class="text-end">Actions</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in measurements %}
+            <tr class="{% if m.pass_fail == 'PASS' %}table-success bg-opacity-25{% elif m.pass_fail == 'FAIL' %}table-danger bg-opacity-25{% endif %}">
+              <td class="fw-semibold text-dark">{{ m.get_operation_type_display }}</td>
+              <td class="font-monospace text-muted small">{{ m.zero_indication_before }}</td>
+              <td class="font-monospace text-primary fw-semibold">{{ m.zero_indication_after }}</td>
+              <td class="font-monospace text-muted small">{{ m.small_weight_added }}</td>
+              <td class="font-monospace fw-bold {% if m.pass_fail == 'FAIL' %}text-danger{% else %}text-dark{% endif %}">
+                {{ m.calculated_error|default:"—" }}
+              </td>
+              <td class="font-monospace text-muted small">&plusmn;{{ m.mpe|default:"—" }}</td>
+              <td>{% include "components/_pass_fail_badge.html" with result=m.pass_fail %}</td>
+              <td class="small text-muted">{{ m.temperature|default:"—" }}{% if m.temperature %}°C{% endif %}</td>
+              <td class="small text-muted">{{ m.observations|default:"—" }}</td>
+              <td>
+                {% if m.is_draft %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Draft</span>
+                {% else %}
+                <span class="badge bg-success bg-opacity-10 text-success"><i class="bi bi-check me-1"></i>Validated</span>
+                {% endif %}
+              </td>
+              {% if not session.is_locked %}
+              <td class="text-end">
+                <form method="post" action="{% url 'measurements:zero_setting_delete' session.pk m.pk %}"
+                      class="d-inline" onsubmit="return confirm('Delete this zero-setting observation?');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-bullseye fs-1 d-block mb-2 text-secondary"></i>
+        <h6>No zero-setting observations recorded yet.</h6>
+        <p class="small mb-0">Use the observation table above to record non-automatic, semi-automatic, or zero-tracking operations.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Dynamic Zero-Setting Live Calculation Script -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const tableBody = document.getElementById("zero-rows-body");
+  const addBtn = document.getElementById("btn-add-zero-row");
+  const dVal = parseFloat("{{ instrument.scale_interval }}") || 0;
+
+  function updateZeroRow(row) {
+    const afterInput = row.querySelector(".zero-after");
+    const deltaInput = row.querySelector(".zero-delta");
+    const badge = row.querySelector(".zero-error-badge");
+    if (!afterInput || !badge) return;
+
+    const after = parseFloat(afterInput.value);
+    const delta = parseFloat(deltaInput ? deltaInput.value : 0) || 0;
+    if (!isNaN(after)) {
+      let err;
+      if (delta > 0) {
+        err = (after + 0.5 * dVal - delta).toFixed(4);
+      } else {
+        err = after.toFixed(4);
+      }
+      badge.textContent = err;
+      badge.className = "badge font-monospace " + (err == 0 ? "bg-success" : "bg-primary text-white");
+    } else {
+      badge.textContent = "—";
+      badge.className = "badge bg-light text-dark font-monospace";
+    }
+  }
+
+  function attachZeroEvents(row) {
+    const inputs = row.querySelectorAll(".zero-after, .zero-delta");
+    inputs.forEach(input => input.addEventListener("input", () => updateZeroRow(row)));
+    const removeBtn = row.querySelector(".btn-remove-zero");
+    if (removeBtn) {
+      removeBtn.addEventListener("click", function () {
+        if (tableBody.querySelectorAll(".zero-row").length > 1) {
+          row.remove();
+        } else {
+          alert("At least one zero check row must remain.");
+        }
+      });
+    }
+  }
+
+  if (tableBody) {
+    tableBody.querySelectorAll(".zero-row").forEach(attachZeroEvents);
+  }
+
+  if (addBtn && tableBody) {
+    addBtn.addEventListener("click", function () {
+      const templateRow = tableBody.querySelector(".zero-row");
+      if (!templateRow) return;
+      const newRow = templateRow.cloneNode(true);
+      newRow.querySelectorAll("input").forEach(input => {
+        if (!input.name.includes("temp") && !input.name.includes("zero_before") && !input.name.includes("zero_after")) {
+          input.value = "0.0000";
+        }
+      });
+      newRow.querySelector(".zero-error-badge").textContent = "—";
+      attachZeroEvents(newRow);
+      tableBody.appendChild(newRow);
+    });
+  }
+});
+</script>
+{% endblock %}
+

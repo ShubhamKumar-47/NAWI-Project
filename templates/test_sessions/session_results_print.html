@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Verification Test Results — {{ session.session_number }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: "Segoe UI", Roboto, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+      font-size: 11pt;
+      color: #1a1a1a;
+      background: #f8fafc;
+      padding: 20px 0;
+    }
+    .print-sheet {
+      background: #ffffff;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 30px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .meta-table th {
+      background-color: #f1f5f9 !important;
+      font-size: 9pt;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 5px 8px;
+    }
+    .meta-table td {
+      font-size: 9.5pt;
+      padding: 5px 8px;
+    }
+    .results-table th {
+      background-color: #f8fafc !important;
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      padding: 4px 6px;
+    }
+    .results-table td {
+      font-size: 9pt;
+      padding: 4px 6px;
+    }
+    .sig-line {
+      border-top: 1px solid #1a1a1a;
+      margin-top: 40px;
+      padding-top: 5px;
+      font-size: 9pt;
+    }
+    @media print {
+      body {
+        background: #ffffff;
+        padding: 0;
+      }
+      .print-sheet {
+        box-shadow: none;
+        border: none;
+        max-width: 100%;
+        padding: 0;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+      table {
+        page-break-inside: auto;
+      }
+      tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Floating Action Bar for Web Preview -->
+<div class="no-print text-center mb-3">
+  <button onclick="window.print()" class="btn btn-primary btn-sm shadow-sm px-4">
+    <i class="bi bi-printer me-1"></i>Print This Test Report
+  </button>
+  <button onclick="window.close()" class="btn btn-outline-secondary btn-sm ms-2">
+    Close Window
+  </button>
+</div>
+
+<div class="print-sheet">
+  <!-- Laboratory Header -->
+  <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+    <div>
+      <h4 class="fw-bold mb-0 text-dark">{{ session.organization.name }}</h4>
+      <div class="text-secondary small">Legal Metrology Testing &amp; Verification Laboratory</div>
+      <div class="text-muted small">Standard: {{ session.get_oiml_edition_display|default:session.oiml_edition }}</div>
+    </div>
+    <div class="text-end">
+      <div class="fw-bold font-monospace fs-6">{{ session.session_number }}</div>
+      <div class="small text-muted">Test Date: {{ session.test_date|date:"Y-m-d" }}</div>
+      <div class="badge {% if report.overall_status == 'PASS' %}bg-success{% elif report.overall_status == 'FAIL' %}bg-danger{% else %}bg-secondary{% endif %} text-uppercase fs-6 mt-1">
+        Verdict: {{ report.overall_status }}
+      </div>
+    </div>
+  </div>
+
+  <h5 class="fw-bold text-center text-uppercase tracking-wide mb-3">
+    Non-Automatic Weighing Instrument Test Results Report
+  </h5>
+
+  <!-- 1. Instrument & Test Metadata -->
+  <div class="row g-3 mb-3">
+    <div class="col-6">
+      <table class="table table-bordered meta-table mb-0">
+        <tbody>
+          <tr>
+            <th style="width: 40%;">Instrument Name</th>
+            <td><strong>{{ instrument.display_name }}</strong></td>
+          </tr>
+          <tr>
+            <th>Manufacturer</th>
+            <td>{{ instrument.manufacturer }}</td>
+          </tr>
+          <tr>
+            <th>Model Designation</th>
+            <td>{{ instrument.model_name|default:instrument.model_number }}</td>
+          </tr>
+          <tr>
+            <th>Serial Number</th>
+            <td class="font-monospace fw-bold">{{ instrument.serial_number }}</td>
+          </tr>
+          <tr>
+            <th>Instrument Type</th>
+            <td>{{ instrument.instrument_type|default:"Electronic NAWI" }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col-6">
+      <table class="table table-bordered meta-table mb-0">
+        <tbody>
+          <tr>
+            <th style="width: 40%;">Accuracy Class</th>
+            <td><strong>Class {{ instrument.get_accuracy_class_display }}</strong></td>
+          </tr>
+          <tr>
+            <th>Max / Min Capacity</th>
+            <td class="font-monospace">{{ instrument.max_capacity }} / {{ instrument.min_capacity }} {{ instrument.unit_of_measure }}</td>
+          </tr>
+          <tr>
+            <th>Scale Intervals (e, d)</th>
+            <td class="font-monospace">e = {{ instrument.actual_scale_interval }} {{ instrument.unit_of_measure }}, d = {{ instrument.scale_interval }} {{ instrument.unit_of_measure }}</td>
+          </tr>
+          <tr>
+            <th>Environmental Temp</th>
+            <td>{{ session.temperature_range }} (Humidity: {{ session.humidity_range }})</td>
+          </tr>
+          <tr>
+            <th>Testing Metrologist</th>
+            <td>{{ session.technician.full_name|default:session.technician.username }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 2. Test Procedures Compliance Summary -->
+  <h6 class="fw-bold text-dark border-bottom pb-1 mb-2 mt-4">1. Summary of Verification Test Procedures</h6>
+  <table class="table table-bordered results-table mb-3">
+    <thead>
+      <tr>
+        <th>Test Procedure</th>
+        <th>Standard Clause</th>
+        <th class="text-center">Observations</th>
+        <th class="text-center">Status / Result</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p_code, p in report.procedure_summaries.items %}
+      <tr>
+        <td><strong>{{ p.name }}</strong></td>
+        <td class="font-monospace text-muted">{{ p.clause }}</td>
+        <td class="text-center">{{ p.total_count }}</td>
+        <td class="text-center fw-bold {% if p.status == 'PASS' %}text-success{% elif p.status == 'FAIL' %}text-danger{% else %}text-muted{% endif %}">
+          {{ p.status }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- 3. Detailed Results by Procedure -->
+  <h6 class="fw-bold text-dark border-bottom pb-1 mb-2 mt-4">2. Detailed Measurement Observations &amp; Calculated Errors</h6>
+  {% for p_code, p in report.procedure_summaries.items %}
+    {% if p.items %}
+    <div class="mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <strong class="small text-dark">{{ p.name }} ({{ p.clause }})</strong>
+        <span class="small font-monospace fw-bold {% if p.status == 'PASS' %}text-success{% elif p.status == 'FAIL' %}text-danger{% else %}text-muted{% endif %}">
+          [{{ p.status }}]
+        </span>
+      </div>
+      <table class="table table-bordered results-table mb-2">
+        <thead>
+          <tr>
+            <th style="width: 35px;">#</th>
+            <th>Load Point / Placement</th>
+            <th class="text-end">Ref. Load</th>
+            <th class="text-end">Indicated Reading</th>
+            <th class="text-end">Error (E)</th>
+            <th class="text-end">MPE Limit</th>
+            <th class="text-center">Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in p.items %}
+          <tr>
+            <td class="text-center text-muted">{{ forloop.counter }}</td>
+            <td>{{ item.title }}</td>
+            <td class="text-end font-monospace">
+              {% if item.ref_load is not None %}{{ item.ref_load }} {{ instrument.unit_of_measure }}{% else %}—{% endif %}
+            </td>
+            <td class="text-end font-monospace">
+              {% if item.indication is not None %}{{ item.indication }} {{ instrument.unit_of_measure }}
+              {% elif item.indication_after is not None %}{{ item.indication_after }} {{ instrument.unit_of_measure }}
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-end font-monospace fw-semibold {% if item.status == 'FAIL' %}text-danger{% endif %}">
+              {% if item.error is not None %}{{ item.error }}
+              {% elif item.change is not None %}{{ item.change }}
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-end font-monospace text-muted">
+              {% if item.mpe is not None %}&plusmn;{{ item.mpe }}{% else %}—{% endif %}
+            </td>
+            <td class="text-center fw-bold {% if item.status == 'PASS' %}text-success{% elif item.status == 'FAIL' %}text-danger{% else %}text-muted{% endif %}">
+              {{ item.status }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  {% endfor %}
+
+  <!-- 4. Metrological Verdict & Signatures -->
+  <div class="border p-3 rounded bg-light mt-4">
+    <div class="row align-items-center">
+      <div class="col-8">
+        <h6 class="fw-bold mb-1">Final Metrological Compliance Determination:</h6>
+        <p class="small text-muted mb-0">
+          The non-automatic weighing instrument identified above was tested in accordance with
+          <strong>{{ session.oiml_edition|default:"OIML R 76-1:2006" }}</strong>.
+          {% if report.overall_status == 'PASS' %}
+          All verified measurement errors and repeatability ranges are strictly within applicable Maximum Permissible Error (MPE) tolerances.
+          {% elif report.overall_status == 'FAIL' %}
+          The instrument failed to satisfy maximum permissible error tolerances. Verification certificate cannot be granted.
+          {% else %}
+          Test verification is incomplete or preliminary observations remain unconfirmed.
+          {% endif %}
+        </p>
+      </div>
+      <div class="col-4 text-end">
+        <span class="fs-4 fw-bold {% if report.overall_status == 'PASS' %}text-success{% elif report.overall_status == 'FAIL' %}text-danger{% else %}text-muted{% endif %} text-uppercase">
+          {{ report.overall_status }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signatures Block -->
+  <div class="row mt-4 pt-3">
+    <div class="col-6">
+      <div class="sig-line">
+        <strong>Tested By:</strong> {{ session.technician.full_name|default:session.technician.username }}<br>
+        <small class="text-muted">Metrology Technician / Operator &mdash; Date: {{ session.test_date|date:"Y-m-d" }}</small>
+      </div>
+    </div>
+    <div class="col-6">
+      <div class="sig-line">
+        <strong>Verified &amp; Approved By:</strong> {{ session.reviewer.full_name|default:"___________________________" }}<br>
+        <small class="text-muted">Authorized Technical Reviewer &mdash; Verification Authority</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
